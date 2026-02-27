@@ -7,7 +7,8 @@ const { migrate } = require('./migrate');
 const { isLicensed, activateLicense } = require('./license');
 const { CursorDoctorCodeActionProvider } = require('./codeactions');
 
-const PURCHASE_URL = 'https://nedcodes.gumroad.com/l/cursor-doctor-pro';
+const PURCHASE_URL_BASE = 'https://nedcodes.gumroad.com/l/cursor-doctor-pro';
+const PURCHASE_URL = PURCHASE_URL_BASE + '?utm_source=vscode&utm_medium=extension&utm_campaign=scan-panel';
 const FIRST_RUN_KEY = 'cursorDoctor.hasShownWelcome';
 
 let diagnosticCollection;
@@ -295,7 +296,7 @@ async function cmdFix() {
       'Activate Key'
     );
     if (choice === 'Get Pro License') {
-      vscode.env.openExternal(vscode.Uri.parse(PURCHASE_URL));
+      vscode.env.openExternal(vscode.Uri.parse(PURCHASE_URL_BASE + "?utm_source=vscode&utm_medium=extension&utm_campaign=fix-paywall"));
     } else if (choice === 'Activate Key') {
       cmdActivate();
     }
@@ -371,7 +372,7 @@ async function cmdGenerate() {
       'Activate Key'
     );
     if (choice === 'Get Pro License') {
-      vscode.env.openExternal(vscode.Uri.parse(PURCHASE_URL));
+      vscode.env.openExternal(vscode.Uri.parse(PURCHASE_URL_BASE + "?utm_source=vscode&utm_medium=extension&utm_campaign=generate-paywall"));
     } else if (choice === 'Activate Key') {
       cmdActivate();
     }
@@ -459,7 +460,7 @@ function showWelcomePanel() {
     + '<h3>Auto-fix everything <span class="pro-badge">PRO</span></h3>'
     + '<p>Run <code>Cursor Doctor: Auto-Fix</code> to repair frontmatter, merge redundant rules, resolve conflicts, and generate starter rules for your stack. One command, clean setup.</p>'
     + '</div></div>'
-    + '<div class="cta"><a href="' + PURCHASE_URL + '">Get Pro — $9 one-time</a></div>'
+    + '<div class="cta"><a href="' + PURCHASE_URL_BASE + '?utm_source=vscode&utm_medium=extension&utm_campaign=welcome-panel">Get Pro — $9 one-time</a></div>'
     + '<div class="footer">Free: scan, lint, diagnostics, migrate · Pro: auto-fix, generate, conflict resolution<br><br>'
     + '<a href="https://github.com/nedcodes-ok/cursor-doctor" style="color:#569cd6">GitHub</a> · '
     + '<a href="https://www.npmjs.com/package/cursor-doctor" style="color:#569cd6">npm</a></div>'

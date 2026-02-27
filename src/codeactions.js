@@ -1,6 +1,6 @@
 const vscode = require('vscode');
 
-const PURCHASE_URL = 'https://nedcodes.gumroad.com/l/cursor-doctor-pro';
+const PURCHASE_URL = 'https://nedcodes.gumroad.com/l/cursor-doctor-pro?utm_source=vscode&utm_medium=extension&utm_campaign=codeaction';
 
 class CursorDoctorCodeActionProvider {
   provideCodeActions(document, range, context) {

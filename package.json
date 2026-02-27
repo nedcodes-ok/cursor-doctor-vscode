@@ -2,7 +2,7 @@
   "name": "cursor-doctor",
   "displayName": "Cursor Doctor",
   "description": "Diagnose and auto-fix your Cursor AI setup. Health grade in your status bar, inline diagnostics, and one-click repair.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "nedcodes",
   "license": "MIT",
   "icon": "icon.png",
@@ -64,8 +64,12 @@
     "languages": [
       {
         "id": "mdc",
-        "extensions": [".mdc"],
-        "aliases": ["Cursor MDC Rule"],
+        "extensions": [
+          ".mdc"
+        ],
+        "aliases": [
+          "Cursor MDC Rule"
+        ],
         "configuration": "./language-configuration.json"
       }
     ]

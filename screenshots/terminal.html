@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0d1117; }
+.terminal {
+  width: 720px;
+  background: #0d1117;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #30363d;
+}
+.titlebar {
+  background: #161b22;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dot { width: 12px; height: 12px; border-radius: 50%; }
+.dot-r { background: #ff5f57; }
+.dot-y { background: #febc2e; }
+.dot-g { background: #28c840; }
+.title { color: #8b949e; font-size: 13px; margin-left: 8px; font-family: monospace; }
+.content {
+  padding: 16px 20px 20px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #c9d1d9;
+}
+.prompt { color: #58a6ff; }
+.cmd { color: #f0f6fc; }
+.dim { color: #484f58; }
+.green { color: #3fb950; }
+.yellow { color: #d29922; }
+.red { color: #f85149; }
+.blue { color: #58a6ff; }
+.cyan { color: #39d353; }
+.bold { font-weight: bold; }
+.grade-line { font-size: 16px; margin: 12px 0 8px; }
+.bar-track { display: inline; }
+.bar-fill { color: #3fb950; }
+.bar-empty { color: #21262d; }
+.pct { color: #3fb950; font-weight: bold; }
+.check { margin: 2px 0; }
+.detail { color: #484f58; margin-left: 24px; font-size: 13px; }
+.summary { margin-top: 10px; }
+.pro { margin-top: 6px; }
+.line { opacity: 0; }
+</style>
+</head>
+<body>
+<div class="terminal">
+  <div class="titlebar">
+    <div class="dot dot-r"></div>
+    <div class="dot dot-y"></div>
+    <div class="dot dot-g"></div>
+    <div class="title">~/my-project</div>
+  </div>
+  <div class="content">
+    <div class="line" id="l0"><span class="prompt">$</span> <span class="cmd">npx cursor-doctor scan</span></div>
+    <div class="line" id="l1">&nbsp;</div>
+    <div class="line grade-line" id="l2"><span class="green bold">▒▒ Cursor Health: B ▒▒</span></div>
+    <div class="line" id="l3">&nbsp;</div>
+    <div class="line" id="l4"><span class="bar-fill">████████████████████████</span><span class="dim">░░░░░░░░</span>  <span class="pct">73%</span></div>
+    <div class="line" id="l5">&nbsp;</div>
+    <div class="line check" id="l6"><span class="green">✓</span> <span class="bold">Rules exist</span></div>
+    <div class="line detail" id="l7">.cursor/rules/ found with .mdc files</div>
+    <div class="line check" id="l8"><span class="yellow">⚠</span> <span class="bold">No legacy .cursorrules</span></div>
+    <div class="line detail" id="l9">.cursorrules exists alongside .mdc — may cause conflicts</div>
+    <div class="line check" id="l10"><span class="red">✗</span> <span class="bold">Rule syntax</span></div>
+    <div class="line detail" id="l11">2 errors, 2 warnings. Run cursor-doctor lint to see issues.</div>
+    <div class="line check" id="l12"><span class="green">✓</span> <span class="bold">Token budget</span></div>
+    <div class="line detail" id="l13">~222 tokens — well within budget</div>
+    <div class="line check" id="l14"><span class="green">✓</span> <span class="bold">Coverage</span></div>
+    <div class="line detail" id="l15">Rules cover your project file types</div>
+    <div class="line check" id="l16"><span class="green">✓</span> <span class="bold">File sizes</span></div>
+    <div class="line detail" id="l17">All context files are reasonably sized</div>
+    <div class="line check" id="l18"><span class="green">✓</span> <span class="bold">alwaysApply usage</span></div>
+    <div class="line detail" id="l19">3 always-active rules — good balance</div>
+    <div class="line check" id="l20"><span class="blue">ℹ</span> <span class="bold">Agent skills</span></div>
+    <div class="line detail" id="l21">No agent skills found (optional)</div>
+    <div class="line" id="l22">&nbsp;</div>
+    <div class="line summary" id="l23"><span class="green">5 passed</span>  <span class="yellow">2 fixable</span></div>
+    <div class="line" id="l24">&nbsp;</div>
+    <div class="line pro" id="l25"><span class="cyan">Auto-fix:</span> npx cursor-doctor fix</div>
+    <div class="line" id="l26"><span class="dim">Pro ($9 one-time) nedcodes.gumroad.com/l/cursor-doctor-pro</span></div>
+  </div>
+</div>
+</body>
+</html>
