@@ -97,18 +97,18 @@ async function lintMdcFile(filePath) {
   const fm = parseFrontmatter(content);
 
   if (!fm.found) {
-    issues.push({ severity: 'error', message: 'Missing YAML frontmatter', hint: 'Add --- block with description and alwaysApply: true' });
+    issues.push({ severity: 'error', code: 'missing-frontmatter', message: 'Missing YAML frontmatter', hint: 'Add --- block with description and alwaysApply: true' });
   } else if (fm.error) {
-    issues.push({ severity: 'error', message: `YAML frontmatter error: ${fm.error}`, hint: 'Fix frontmatter indentation/syntax' });
+    issues.push({ severity: 'error', code: 'frontmatter-error', message: `YAML frontmatter error: ${fm.error}`, hint: 'Fix frontmatter indentation/syntax' });
   } else {
     if (!fm.data.alwaysApply) {
-      issues.push({ severity: 'error', message: 'Missing alwaysApply: true', hint: 'Add alwaysApply: true to frontmatter for agent mode' });
+      issues.push({ severity: 'error', code: 'missing-alwaysapply', message: 'Missing alwaysApply: true', hint: 'Add alwaysApply: true to frontmatter for agent mode' });
     }
     if (!fm.data.description) {
-      issues.push({ severity: 'warning', message: 'Missing description in frontmatter', hint: 'Add a description so Cursor knows when to apply this rule' });
+      issues.push({ severity: 'warning', code: 'missing-description', message: 'Missing description in frontmatter', hint: 'Add a description so Cursor knows when to apply this rule' });
     }
     if (fm.data.globs && typeof fm.data.globs === 'string' && fm.data.globs.includes(',') && !fm.data.globs.trim().startsWith('[')) {
-      issues.push({ severity: 'error', message: 'Globs should be YAML array, not comma-separated string', hint: 'Use globs:\\n  - "*.ts"\\n  - "*.tsx"' });
+      issues.push({ severity: 'error', code: 'globs-not-array', message: 'Globs should be YAML array, not comma-separated string', hint: 'Use globs:\\n  - "*.ts"\\n  - "*.tsx"' });
     }
   }
 
@@ -118,7 +118,7 @@ async function lintMdcFile(filePath) {
     const idx = contentLower.indexOf(pattern);
     if (idx !== -1) {
       const lineNum = content.slice(0, idx).split('\n').length;
-      issues.push({ severity: 'warning', message: `Vague rule detected: "${pattern}"`, line: lineNum });
+      issues.push({ severity: 'warning', code: 'vague-rule', message: `Vague rule detected: "${pattern}"`, line: lineNum });
     }
   }
 
@@ -129,6 +129,7 @@ async function lintMdcFile(filePath) {
   if (body.length > 2000) {
     issues.push({
       severity: 'warning',
+      code: 'rule-too-long',
       message: 'Rule body is very long (>2000 chars, ~500+ tokens)',
       hint: 'Shorter, specific rules outperform long generic ones. Consider splitting into focused rules.',
     });
@@ -139,6 +140,7 @@ async function lintMdcFile(filePath) {
   if (body.length > 200 && !hasCodeBlocks) {
     issues.push({
       severity: 'warning',
+      code: 'no-examples',
       message: 'Rule has no code examples',
       hint: 'Rules with examples get followed more reliably by the AI model.',
     });
@@ -148,6 +150,7 @@ async function lintMdcFile(filePath) {
   if (fm.found && body.trim().length === 0) {
     issues.push({
       severity: 'error',
+      code: 'empty-body',
       message: 'Rule file has frontmatter but no instructions',
       hint: 'Add rule instructions after the --- frontmatter block.',
     });
@@ -157,6 +160,7 @@ async function lintMdcFile(filePath) {
   if (fm.data && fm.data.description && fm.data.description.length < 10) {
     issues.push({
       severity: 'warning',
+      code: 'description-too-short',
       message: 'Description is very short (<10 chars)',
       hint: 'A descriptive description helps Cursor decide when to apply this rule.',
     });
@@ -166,6 +170,7 @@ async function lintMdcFile(filePath) {
   if (fm.data && fm.data.description && fm.data.description.length > 200) {
     issues.push({
       severity: 'warning',
+      code: 'description-too-long',
       message: 'Description is very long (>200 chars)',
       hint: 'Keep descriptions concise. Put detailed instructions in the rule body, not the description.',
     });
@@ -175,26 +180,26 @@ async function lintMdcFile(filePath) {
   if (fm.data && fm.data.globs) {
     const globs = parseGlobs(fm.data.globs);
     for (const glob of globs) {
-      // Overly broad glob
       if (glob === '*' || glob === '**') {
         issues.push({
           severity: 'warning',
+          code: 'broad-glob',
           message: 'Overly broad glob pattern',
           hint: 'This matches everything. Consider using more specific patterns or just alwaysApply: true.',
         });
       }
-      // Glob contains spaces
       if (glob.includes(' ') && !glob.includes('"') && !glob.includes("'")) {
         issues.push({
           severity: 'warning',
+          code: 'glob-spaces',
           message: 'Glob pattern contains spaces',
           hint: 'Glob patterns with spaces may not match correctly.',
         });
       }
-      // Glob is *.
       if (glob === '*.') {
         issues.push({
           severity: 'warning',
+          code: 'glob-no-ext',
           message: 'Glob pattern has no file extension after dot',
         });
       }
@@ -207,6 +212,7 @@ async function lintMdcFile(filePath) {
     if (globs.length > 0) {
       issues.push({
         severity: 'info',
+        code: 'alwaysapply-with-globs',
         message: 'alwaysApply is true with globs set',
         hint: 'When alwaysApply is true, globs serve as a hint to the model but don\'t filter. This is fine if intentional.',
       });
@@ -222,6 +228,7 @@ async function lintMdcFile(filePath) {
     if (nonUrlLines.length < 2) {
       issues.push({
         severity: 'warning',
+        code: 'body-just-url',
         message: 'Rule body appears to be just a URL',
         hint: 'Cursor cannot follow URLs. Put the actual instructions in the rule body.',
       });
@@ -329,6 +336,7 @@ async function lintCursorrules(filePath) {
 
   issues.push({
     severity: 'warning',
+    code: 'legacy-cursorrules',
     message: '.cursorrules may be ignored in agent mode',
     hint: 'Use .cursor/rules/*.mdc with alwaysApply: true for agent mode compatibility',
   });
@@ -339,7 +347,7 @@ async function lintCursorrules(filePath) {
     const idx = contentLower.indexOf(pattern);
     if (idx !== -1) {
       const lineNum = content.slice(0, idx).split('\n').length;
-      issues.push({ severity: 'warning', message: `Vague rule detected: "${pattern}"`, line: lineNum });
+      issues.push({ severity: 'warning', code: 'vague-rule', message: `Vague rule detected: "${pattern}"`, line: lineNum });
     }
   }
 

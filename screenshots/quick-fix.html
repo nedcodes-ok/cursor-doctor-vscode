@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1e1e1e; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.container { width: 800px; height: 400px; position: relative; overflow: hidden; }
+
+.editor {
+  background: #1e1e1e;
+  padding: 24px 32px;
+  height: 358px;
+  color: #d4d4d4;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 20px;
+}
+.line-num { color: #858585; display: inline-block; width: 32px; text-align: right; margin-right: 16px; }
+.keyword { color: #569cd6; }
+.string { color: #ce9178; }
+.comment { color: #6a9955; }
+.field { color: #9cdcfe; }
+.sep { color: #808080; }
+.error-line {
+  background: rgba(255, 0, 0, 0.08);
+  display: block;
+}
+.squiggly-red {
+  text-decoration: underline wavy #f44747;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+.lightbulb {
+  color: #ffcc00;
+  font-size: 14px;
+  position: absolute;
+  left: 18px;
+  top: 66px;
+}
+
+/* Quick fix menu */
+.quickfix-menu {
+  position: absolute;
+  top: 86px;
+  left: 64px;
+  background: #252526;
+  border: 1px solid #454545;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  width: 340px;
+  font-size: 13px;
+  color: #ccc;
+  overflow: hidden;
+}
+.qf-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.qf-item:first-child {
+  background: #094771;
+  color: #fff;
+}
+.qf-item:hover { background: #094771; }
+.qf-icon { font-size: 14px; width: 18px; text-align: center; }
+.qf-sep { border-top: 1px solid #454545; }
+.pro-tag { background: #569cd6; color: #fff; padding: 1px 6px; border-radius: 8px; font-size: 10px; font-weight: bold; margin-left: auto; }
+
+.statusbar {
+  height: 42px;
+  background: #007acc;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 12px;
+  color: #fff;
+}
+.sb-item { padding: 0 8px; display: flex; align-items: center; gap: 4px; }
+.sb-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.3); margin: 0 4px; }
+.sb-error { color: #f44747; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="editor">
+    <div><span class="line-num">1</span><span class="sep">---</span></div>
+    <div><span class="line-num">2</span><span class="field">description</span><span class="sep">:</span> <span class="string">React component rules</span></div>
+    <div class="error-line"><span class="line-num">3</span><span class="field">globs</span><span class="sep">:</span> <span class="string squiggly-red">*.tsx, *.jsx</span></div>
+    <div><span class="line-num">4</span><span class="sep">---</span></div>
+    <div><span class="line-num">5</span></div>
+    <div><span class="line-num">6</span><span class="comment"># React Components</span></div>
+    <div><span class="line-num">7</span></div>
+    <div><span class="line-num">8</span>Use functional components with hooks.</div>
+    <div><span class="line-num">9</span>Prefer named exports over default exports.</div>
+    <div><span class="line-num">10</span></div>
+    <div><span class="line-num">11</span><span class="comment">```tsx</span></div>
+    <div><span class="line-num">12</span><span class="keyword">export function</span> <span class="field">Button</span>({ label }: Props) {</div>
+    <div><span class="line-num">13</span>  <span class="keyword">return</span> &lt;<span class="keyword">button</span>&gt;{label}&lt;/<span class="keyword">button</span>&gt;</div>
+    <div><span class="line-num">14</span>}</div>
+    <div><span class="line-num">15</span><span class="comment">```</span></div>
+    <span class="lightbulb">💡</span>
+  </div>
+  <div class="quickfix-menu">
+    <div class="qf-item"><span class="qf-icon">🔧</span> Convert globs to YAML array</div>
+    <div class="qf-item"><span class="qf-icon">➕</span> Add alwaysApply: true</div>
+    <div class="qf-item qf-sep"><span class="qf-icon">⚡</span> Fix all issues with Auto-Fix <span class="pro-tag">PRO</span></div>
+  </div>
+  <div class="statusbar">
+    <div class="sb-item">🔀 main</div>
+    <div class="sb-sep"></div>
+    <div class="sb-item"><span class="sb-error">✗</span> Cursor: D (38%)</div>
+    <div class="sb-sep"></div>
+    <div class="sb-item">Ln 3, Col 8</div>
+    <div class="sb-sep"></div>
+    <div class="sb-item">UTF-8</div>
+  </div>
+</div>
+</body>
+</html>

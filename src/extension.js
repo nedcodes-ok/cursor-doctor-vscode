@@ -5,8 +5,10 @@ const { doctor } = require('./doctor');
 const { autoFix } = require('./autofix');
 const { migrate } = require('./migrate');
 const { isLicensed, activateLicense } = require('./license');
+const { CursorDoctorCodeActionProvider } = require('./codeactions');
 
 const PURCHASE_URL = 'https://nedcodes.gumroad.com/l/cursor-doctor-pro';
+const FIRST_RUN_KEY = 'cursorDoctor.hasShownWelcome';
 
 let diagnosticCollection;
 let statusBarItem;
@@ -21,6 +23,14 @@ function activate(context) {
   statusBarItem.command = 'cursorDoctor.scan';
   statusBarItem.tooltip = 'Click to run Cursor Doctor scan';
   context.subscriptions.push(statusBarItem);
+
+  // Code action provider (quick fixes)
+  var mdcSelector = { language: 'mdc', scheme: 'file' };
+  var cursorruleSelector = { pattern: '**/.cursorrules' };
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(mdcSelector, new CursorDoctorCodeActionProvider(), CursorDoctorCodeActionProvider.metadata),
+    vscode.languages.registerCodeActionsProvider(cursorruleSelector, new CursorDoctorCodeActionProvider(), CursorDoctorCodeActionProvider.metadata)
+  );
 
   // Commands
   context.subscriptions.push(
@@ -54,6 +64,13 @@ function activate(context) {
   // Run scan on activation
   updateHealthGrade();
   lintWorkspace();
+
+  // First-run welcome panel
+  var hasShown = context.globalState.get(FIRST_RUN_KEY, false);
+  if (!hasShown) {
+    context.globalState.update(FIRST_RUN_KEY, true);
+    showWelcomePanel();
+  }
 }
 
 // --- Status bar health grade ---
@@ -253,6 +270,7 @@ function issuesToDiagnostics(issues, document) {
 
     var diagnostic = new vscode.Diagnostic(range, issue.message, severity);
     diagnostic.source = 'cursor-doctor';
+    if (issue.code) diagnostic.code = issue.code;
 
     if (issue.hint) {
       diagnostic.message += '\n' + issue.hint;
@@ -398,6 +416,54 @@ async function cmdActivate() {
   } catch (e) {
     vscode.window.showErrorMessage('Activation failed: ' + e.message);
   }
+}
+
+function showWelcomePanel() {
+  var panel = vscode.window.createWebviewPanel(
+    'cursorDoctorWelcome',
+    'Welcome to Cursor Doctor',
+    vscode.ViewColumn.One,
+    { enableScripts: true }
+  );
+
+  panel.webview.html = '<!DOCTYPE html><html><head><style>'
+    + 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 32px; color: #ccc; background: #1e1e1e; max-width: 680px; margin: 0 auto; }'
+    + 'h1 { color: #4ec9b0; font-size: 28px; margin-bottom: 8px; }'
+    + '.subtitle { color: #999; font-size: 16px; margin-bottom: 32px; }'
+    + '.step { display: flex; align-items: flex-start; margin: 24px 0; padding: 16px; background: #252525; border-radius: 8px; border-left: 3px solid #4ec9b0; }'
+    + '.step-num { background: #4ec9b0; color: #1e1e1e; font-weight: bold; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-right: 16px; }'
+    + '.step-content h3 { margin: 0 0 4px 0; color: #e0e0e0; font-size: 15px; }'
+    + '.step-content p { margin: 0; color: #999; font-size: 13px; }'
+    + 'code { background: #333; padding: 2px 6px; border-radius: 3px; font-size: 13px; color: #ce9178; }'
+    + '.pro-badge { background: #569cd6; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; margin-left: 8px; }'
+    + '.cta { margin-top: 32px; text-align: center; }'
+    + '.cta a { display: inline-block; background: #4ec9b0; color: #1e1e1e; text-decoration: none; padding: 10px 24px; border-radius: 6px; font-weight: bold; font-size: 14px; }'
+    + '.cta a:hover { background: #3db89e; }'
+    + '.footer { margin-top: 32px; text-align: center; color: #666; font-size: 12px; }'
+    + '</style></head><body>'
+    + '<h1>🏥 Cursor Doctor</h1>'
+    + '<div class="subtitle">Your Cursor AI setup, diagnosed and fixed.</div>'
+    + '<div class="step"><div class="step-num">1</div><div class="step-content">'
+    + '<h3>Check your health grade</h3>'
+    + '<p>Look at the <strong>status bar</strong> (bottom left). You\'ll see a letter grade (A-F) for your Cursor setup. Click it to see the full report.</p>'
+    + '</div></div>'
+    + '<div class="step"><div class="step-num">2</div><div class="step-content">'
+    + '<h3>Fix issues inline</h3>'
+    + '<p>Open any <code>.mdc</code> file. Errors and warnings appear with squiggly underlines. Hover for details, or click the <strong>💡 lightbulb</strong> for quick fixes.</p>'
+    + '</div></div>'
+    + '<div class="step"><div class="step-num">3</div><div class="step-content">'
+    + '<h3>Run a full scan</h3>'
+    + '<p>Open the Command Palette (<code>Ctrl+Shift+P</code>) and run <code>Cursor Doctor: Scan Health</code> for a detailed breakdown of every check.</p>'
+    + '</div></div>'
+    + '<div class="step"><div class="step-num">4</div><div class="step-content">'
+    + '<h3>Auto-fix everything <span class="pro-badge">PRO</span></h3>'
+    + '<p>Run <code>Cursor Doctor: Auto-Fix</code> to repair frontmatter, merge redundant rules, resolve conflicts, and generate starter rules for your stack. One command, clean setup.</p>'
+    + '</div></div>'
+    + '<div class="cta"><a href="' + PURCHASE_URL + '">Get Pro — $9 one-time</a></div>'
+    + '<div class="footer">Free: scan, lint, diagnostics, migrate · Pro: auto-fix, generate, conflict resolution<br><br>'
+    + '<a href="https://github.com/nedcodes-ok/cursor-doctor" style="color:#569cd6">GitHub</a> · '
+    + '<a href="https://www.npmjs.com/package/cursor-doctor" style="color:#569cd6">npm</a></div>'
+    + '</body></html>';
 }
 
 function deactivate() {

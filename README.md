@@ -2,15 +2,27 @@
 
 **Diagnose and auto-fix your Cursor AI setup — right in your editor.**
 
-Health grade in your status bar. Inline diagnostics on save. One-click repair.
-
-![Cursor Doctor](https://raw.githubusercontent.com/nedcodes-ok/cursor-doctor-vscode/main/icon.png)
+Health grade in your status bar. Inline diagnostics on save. One-click quick fixes.
 
 ## Features
 
 ### 🏥 Health Grade in Status Bar
 
 See your Cursor setup health at a glance — **A through F** — updated every time you save a rule file. Click it to see the full report.
+
+![Status Bar Grade](https://raw.githubusercontent.com/nedcodes-ok/cursor-doctor-vscode/main/images/status-bar.png)
+
+### 🔍 Full Scan Report
+
+Run a scan to see every check, what passed, and what needs fixing.
+
+![Scan Report](https://raw.githubusercontent.com/nedcodes-ok/cursor-doctor-vscode/main/images/scan-report.png)
+
+### 💡 Quick Fix Actions
+
+Click the lightbulb on any issue to fix it instantly — add frontmatter, convert globs, add missing fields. No manual editing needed.
+
+![Quick Fixes](https://raw.githubusercontent.com/nedcodes-ok/cursor-doctor-vscode/main/images/quick-fix.png)
 
 ### 🔍 9 Health Checks
 

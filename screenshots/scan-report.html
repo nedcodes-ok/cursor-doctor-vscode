@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1e1e1e; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.container { width: 800px; height: 500px; overflow: hidden; }
+
+/* Tab bar */
+.tab-bar {
+  background: #252526;
+  display: flex;
+  height: 36px;
+  border-bottom: 1px solid #1e1e1e;
+}
+.tab {
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: #969696;
+  border-right: 1px solid #1e1e1e;
+}
+.tab.active {
+  background: #1e1e1e;
+  color: #fff;
+  border-bottom: 2px solid #4ec9b0;
+}
+
+/* Report content */
+.report {
+  padding: 32px;
+  color: #ccc;
+}
+.grade { font-size: 56px; font-weight: bold; color: #cca700; display: inline; }
+.pct { font-size: 28px; color: #cca700; margin-left: 8px; vertical-align: super; }
+.bar-bg { width: 240px; height: 8px; background: #333; border-radius: 4px; margin: 16px 0; }
+.bar-fill { width: 156px; height: 8px; background: #cca700; border-radius: 4px; }
+.summary { margin: 12px 0 24px; font-size: 14px; }
+.summary .pass { color: #4ec9b0; }
+.summary .fix { color: #cca700; }
+
+.check {
+  margin: 10px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.check-icon { font-size: 16px; flex-shrink: 0; width: 20px; text-align: center; }
+.check-pass .check-icon { color: #4ec9b0; }
+.check-warn .check-icon { color: #cca700; }
+.check-fail .check-icon { color: #f44747; }
+.check-info .check-icon { color: #569cd6; }
+.check-name { font-weight: 600; font-size: 14px; color: #e0e0e0; }
+.check-detail { font-size: 12px; color: #888; margin-top: 2px; }
+
+.pro-box {
+  margin-top: 20px;
+  padding: 14px 16px;
+  background: #2d2d2d;
+  border-radius: 8px;
+  border-left: 3px solid #569cd6;
+  font-size: 13px;
+}
+.pro-box a { color: #569cd6; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="tab-bar">
+    <div class="tab">typescript.mdc</div>
+    <div class="tab active">🏥 Cursor Doctor: Health Report</div>
+    <div class="tab">react.mdc</div>
+  </div>
+  <div class="report">
+    <span class="grade">C</span><span class="pct">65%</span>
+    <div class="bar-bg"><div class="bar-fill"></div></div>
+    <div class="summary"><span class="pass">6 passed</span> &nbsp; <span class="fix">3 fixable</span></div>
+
+    <div class="check check-pass"><span class="check-icon">✓</span><div><div class="check-name">Rules exist</div><div class="check-detail">.cursor/rules/ found with 4 .mdc files</div></div></div>
+    <div class="check check-fail"><span class="check-icon">✗</span><div><div class="check-name">No legacy .cursorrules</div><div class="check-detail">.cursorrules exists alongside .mdc rules — may cause conflicts</div></div></div>
+    <div class="check check-warn"><span class="check-icon">⚠</span><div><div class="check-name">Lint checks</div><div class="check-detail">2 errors, 3 warnings across rule files</div></div></div>
+    <div class="check check-pass"><span class="check-icon">✓</span><div><div class="check-name">Token budget</div><div class="check-detail">~1,800 tokens — well within limits</div></div></div>
+    <div class="check check-pass"><span class="check-icon">✓</span><div><div class="check-name">Coverage</div><div class="check-detail">Rules cover .ts, .tsx, .css, .json</div></div></div>
+    <div class="check check-warn"><span class="check-icon">⚠</span><div><div class="check-name">Conflicts</div><div class="check-detail">2 potential conflicts detected between rule files</div></div></div>
+    <div class="check check-pass"><span class="check-icon">✓</span><div><div class="check-name">Agent skills</div><div class="check-detail">2 skills found in .claude/skills/</div></div></div>
+
+    <div class="pro-box">💡 <strong>3 issues can be auto-fixed.</strong> Run <code>Cursor Doctor: Auto-Fix</code> from the command palette.<br><span style="color:#888; font-size:12px;">Pro license required ($9 one-time)</span></div>
+  </div>
+</div>
+</body>
+</html>
