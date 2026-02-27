@@ -62,6 +62,13 @@ Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 
 👉 [Get Pro](https://nedcodes.gumroad.com/l/cursor-doctor-pro)
 
+## Install
+
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=nedcodes.cursor-doctor)
+- [OpenVSX](https://open-vsx.org/extension/nedcodes/cursor-doctor) (used by Cursor)
+
+Or search **"Cursor Doctor"** in the extensions panel.
+
 ## Also Available as CLI
 
 ```bash
