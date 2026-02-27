@@ -1,0 +1,73 @@
+{
+  "name": "cursor-doctor",
+  "displayName": "Cursor Doctor",
+  "description": "Diagnose and auto-fix your Cursor AI setup. Health grade in your status bar, inline diagnostics, and one-click repair.",
+  "version": "0.1.0",
+  "publisher": "nedcodes",
+  "license": "MIT",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nedcodes-ok/cursor-doctor-vscode"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "cursor",
+    "cursor-ai",
+    "cursorrules",
+    "mdc",
+    "ai-coding",
+    "diagnostics",
+    "health-check",
+    "linter"
+  ],
+  "activationEvents": [
+    "workspaceContains:.cursor/rules",
+    "workspaceContains:.cursorrules",
+    "workspaceContains:AGENTS.md",
+    "workspaceContains:CLAUDE.md"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cursorDoctor.scan",
+        "title": "Cursor Doctor: Scan Health"
+      },
+      {
+        "command": "cursorDoctor.lint",
+        "title": "Cursor Doctor: Lint Rules"
+      },
+      {
+        "command": "cursorDoctor.fix",
+        "title": "Cursor Doctor: Auto-Fix (Pro)"
+      },
+      {
+        "command": "cursorDoctor.migrate",
+        "title": "Cursor Doctor: Migrate .cursorrules to .mdc"
+      },
+      {
+        "command": "cursorDoctor.generate",
+        "title": "Cursor Doctor: Generate Starter Rules"
+      },
+      {
+        "command": "cursorDoctor.activate",
+        "title": "Cursor Doctor: Activate Pro License"
+      }
+    ],
+    "languages": [
+      {
+        "id": "mdc",
+        "extensions": [".mdc"],
+        "aliases": ["Cursor MDC Rule"],
+        "configuration": "./language-configuration.json"
+      }
+    ]
+  }
+}
