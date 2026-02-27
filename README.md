@@ -89,6 +89,11 @@ npx cursor-doctor scan
 
 [cursor-doctor on npm](https://www.npmjs.com/package/cursor-doctor) | [GitHub](https://github.com/nedcodes-ok/cursor-doctor)
 
+## Related
+
+- **[rule-porter](https://github.com/nedcodes-ok/rule-porter)** — Convert your Cursor rules to CLAUDE.md, AGENTS.md, Copilot, or Windsurf (and back). `npx rule-porter --to agents-md`
+- **[cursor-doctor CLI](https://www.npmjs.com/package/cursor-doctor)** — Same engine, runs from the terminal. `npx cursor-doctor scan`
+
 ## License
 
 MIT
