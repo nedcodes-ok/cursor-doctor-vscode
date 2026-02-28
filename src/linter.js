@@ -839,7 +839,8 @@ async function lintContextFiles(dir) {
     const agentsWords = new Set(agentsContent.split(/\s+/).filter(w => w.length > 4));
     const claudeWords = new Set(claudeContent.split(/\s+/).filter(w => w.length > 4));
     const intersection = new Set([...agentsWords].filter(w => claudeWords.has(w)));
-    const overlapRatio = intersection.size / Math.min(agentsWords.size, claudeWords.size);
+    const minSize = Math.min(agentsWords.size, claudeWords.size);
+    const overlapRatio = minSize > 0 ? intersection.size / minSize : 0;
     
     if (overlapRatio > 0.3) {
       issues.push({
@@ -1034,31 +1035,37 @@ async function lintProject(dir) {
   }
 
   // NEW: Run project structure checks
-  const structureIssues = await lintProjectStructure(dir);
-  if (structureIssues.length > 0) {
-    results.push({
-      file: path.join(dir, '.cursor/'),
-      issues: structureIssues,
-    });
-  }
+  try {
+    const structureIssues = await lintProjectStructure(dir);
+    if (structureIssues.length > 0) {
+      results.push({
+        file: path.join(dir, '.cursor/'),
+        issues: structureIssues,
+      });
+    }
+  } catch (e) { /* structure lint failed gracefully */ }
 
   // NEW: Run context file checks
-  const contextIssues = await lintContextFiles(dir);
-  if (contextIssues.length > 0) {
-    results.push({
-      file: dir,
-      issues: contextIssues,
-    });
-  }
+  try {
+    const contextIssues = await lintContextFiles(dir);
+    if (contextIssues.length > 0) {
+      results.push({
+        file: dir,
+        issues: contextIssues,
+      });
+    }
+  } catch (e) { /* context lint failed gracefully */ }
 
   // NEW: Run config checks
-  const configIssues = await lintCursorConfig(dir);
-  if (configIssues.length > 0) {
-    results.push({
-      file: path.join(dir, '.cursor/'),
-      issues: configIssues,
-    });
-  }
+  try {
+    const configIssues = await lintCursorConfig(dir);
+    if (configIssues.length > 0) {
+      results.push({
+        file: path.join(dir, '.cursor/'),
+        issues: configIssues,
+      });
+    }
+  } catch (e) { /* config lint failed gracefully */ }
 
   return results;
 }
