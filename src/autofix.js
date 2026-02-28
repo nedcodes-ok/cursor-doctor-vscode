@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { lintProject, parseFrontmatter } = require('./linter');
+const { lintProject, parseFrontmatter } = require('./index');
 const { loadRules, findRedundancy, findConflicts } = require('./audit');
 const { getTemplate } = require('./templates');
 const { showStats } = require('./stats');
