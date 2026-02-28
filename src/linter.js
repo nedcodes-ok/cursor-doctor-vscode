@@ -28,6 +28,26 @@ const VAGUE_PATTERNS = [
   'be concise',
 ];
 
+function findVagueRules(content) {
+  const issues = [];
+  const lines = content.split('\n');
+  for (var vi = 0; vi < lines.length; vi++) {
+    const lineLower = lines[vi].toLowerCase().trim();
+    if (lineLower.startsWith('#') || lineLower.startsWith('```') || lineLower.length === 0) continue;
+    for (const pattern of VAGUE_PATTERNS) {
+      const idx = lineLower.indexOf(pattern);
+      if (idx === -1) continue;
+      const after = lineLower.slice(idx + pattern.length).trim();
+      if (after.startsWith('with ') || after.startsWith('for ') || after.startsWith('in ') ||
+          after.startsWith('by ') || after.startsWith('using ') || after.startsWith('according to ') ||
+          after.startsWith('and ')) continue;
+      issues.push({ severity: 'warning', message: `Vague rule detected: "${pattern}"`, line: vi + 1 });
+      break;
+    }
+  }
+  return issues;
+}
+
 function parseFrontmatter(content) {
   const match = content.match(/^---\n([\s\S]*?)\n---/);
   if (!match) return { found: false, data: null, error: null };
@@ -143,8 +163,13 @@ async function lintMdcFile(filePath) {
     if (fm.data.alwaysApply === undefined && !hasGlobs) {
       issues.push({ severity: 'warning', message: 'No alwaysApply or globs set — rule may only apply when manually referenced', hint: 'Add alwaysApply: true for global rules, or add globs to scope to specific files' });
     }
-    if (!fm.data.description) {
-      issues.push({ severity: 'warning', message: 'Missing description in frontmatter', hint: 'Add a description so Cursor knows when to apply this rule' });
+    var descEmpty = !fm.data.description || (typeof fm.data.description === 'string' && fm.data.description.trim() === '') || (Array.isArray(fm.data.description) && fm.data.description.length === 0);
+    if (descEmpty) {
+      issues.push({ severity: 'warning', message: 'Missing or empty description in frontmatter', hint: 'Add a description so Cursor knows when to apply this rule' });
+    }
+    // Non-functional rule: alwaysApply is explicitly false and no globs
+    if (fm.data.alwaysApply === false && !hasGlobs) {
+      issues.push({ severity: 'error', message: 'Rule will never load: alwaysApply is false and no globs are set', hint: 'Set alwaysApply: true for global rules, or add globs to scope to specific files' });
     }
     if (fm.data.globs && typeof fm.data.globs === 'string' && fm.data.globs.includes(',') && !fm.data.globs.trim().startsWith('[')) {
       issues.push({ severity: 'warning', message: 'Globs as comma-separated string — consider using YAML array format', hint: 'Use globs:\\n  - "*.ts"\\n  - "*.tsx"' });
@@ -171,26 +196,10 @@ async function lintMdcFile(filePath) {
       });
     }
 
-    // alwaysApply is false with no globs
-    var parsedGlobs = fm.data.globs ? (Array.isArray(fm.data.globs) ? fm.data.globs : parseGlobs(fm.data.globs)) : [];
-    if (fm.data.alwaysApply === false && parsedGlobs.length === 0) {
-      issues.push({
-        severity: 'error',
-        message: 'alwaysApply is false with no globs — rule will never trigger',
-        hint: 'Either set alwaysApply: true or add globs to specify when this rule applies.',
-      });
-    }
   }
 
-  // Vague rules
-  const contentLower = content.toLowerCase();
-  for (const pattern of VAGUE_PATTERNS) {
-    const idx = contentLower.indexOf(pattern);
-    if (idx !== -1) {
-      const lineNum = content.slice(0, idx).split('\n').length;
-      issues.push({ severity: 'warning', message: `Vague rule detected: "${pattern}"`, line: lineNum });
-    }
-  }
+  // Vague rules (context-aware)
+  issues.push(...findVagueRules(content));
 
   // Get body content for additional checks
   const body = getBody(content);
@@ -587,7 +596,8 @@ async function lintSkillFile(filePath) {
     if (!fm.data.name) {
       issues.push({ severity: 'error', message: 'Missing name in frontmatter', hint: 'Add name: your-skill-name to frontmatter' });
     }
-    if (!fm.data.description) {
+    var descEmpty = !fm.data.description || (typeof fm.data.description === 'string' && fm.data.description.trim() === '') || (Array.isArray(fm.data.description) && fm.data.description.length === 0);
+    if (descEmpty) {
       issues.push({ severity: 'error', message: 'Missing description in frontmatter', hint: 'Add a description so the agent knows when to use this skill' });
     }
     if (fm.data.description && fm.data.description.length < 20) {
@@ -610,15 +620,8 @@ async function lintSkillFile(filePath) {
     issues.push({ severity: 'warning', message: 'Long skill with no headings', hint: 'Add ## sections to organize instructions for better agent comprehension' });
   }
 
-  // Vague rules (same as .mdc)
-  const contentLower = content.toLowerCase();
-  for (const pattern of VAGUE_PATTERNS) {
-    const idx = contentLower.indexOf(pattern);
-    if (idx !== -1) {
-      const lineNum = content.slice(0, idx).split('\n').length;
-      issues.push({ severity: 'warning', message: `Vague instruction: "${pattern}"`, line: lineNum });
-    }
-  }
+  // Vague rules (context-aware)
+  issues.push(...findVagueRules(content));
 
   return { file: filePath, issues };
 }
@@ -675,15 +678,8 @@ async function lintCursorrules(filePath) {
     hint: 'Use .cursor/rules/*.mdc with alwaysApply: true for agent mode compatibility',
   });
 
-  // Vague rules
-  const contentLower = content.toLowerCase();
-  for (const pattern of VAGUE_PATTERNS) {
-    const idx = contentLower.indexOf(pattern);
-    if (idx !== -1) {
-      const lineNum = content.slice(0, idx).split('\n').length;
-      issues.push({ severity: 'warning', message: `Vague rule detected: "${pattern}"`, line: lineNum });
-    }
-  }
+  // Vague rules (context-aware)
+  issues.push(...findVagueRules(content));
 
   return { file: filePath, issues };
 }
