@@ -24,17 +24,20 @@ Click the lightbulb on any issue to fix it instantly — add frontmatter, conver
 
 ![Quick Fixes](https://raw.githubusercontent.com/nedcodes-ok/cursor-doctor-vscode/main/images/quick-fix.png)
 
-### 🔍 9 Health Checks
+### 🔍 12 Health Checks
 
 - ✅ Rules exist (.mdc format)
 - ✅ No legacy .cursorrules conflicts
-- ✅ Rule syntax (frontmatter, globs, structure)
+- ✅ Rule syntax (frontmatter, globs, dead rules, binary detection)
 - ✅ Token budget (are your rules eating your context window?)
 - ✅ Coverage gaps (file types without rules)
 - ✅ File sizes (oversized context files)
 - ✅ alwaysApply balance
 - ✅ Agent skills detection
-- ✅ Plugin validation
+- ✅ Agent configs (CLAUDE.md, AGENTS.md validation)
+- ✅ MCP config (mcp.json syntax, missing fields, secrets)
+- ✅ Conflicts (contradictory instructions across rules)
+- ✅ Redundancy (duplicate content between rules)
 
 ### 📋 Inline Diagnostics
 
@@ -91,6 +94,7 @@ npx cursor-doctor scan
 
 ## Related
 
+- **[rule-gen](https://github.com/nedcodes-ok/rule-gen)** — Generate rules from your codebase using Google Gemini. `npx rulegen-ai`
 - **[rule-porter](https://github.com/nedcodes-ok/rule-porter)** — Convert your Cursor rules to CLAUDE.md, AGENTS.md, Copilot, or Windsurf (and back). `npx rule-porter --to agents-md`
 - **[cursor-doctor CLI](https://www.npmjs.com/package/cursor-doctor)** — Same engine, runs from the terminal. `npx cursor-doctor scan`
 
