@@ -46,7 +46,10 @@ function lintClaudeMd(dir) {
     return { file: 'CLAUDE.md', exists: false, issues: [] };
   }
 
-  var content = fs.readFileSync(filePath, 'utf-8');
+  var content;
+  try { content = fs.readFileSync(filePath, 'utf-8'); } catch (e) {
+    return { file: 'CLAUDE.md', exists: true, size: 0, issues: [{ severity: 'error', message: 'Cannot read file: ' + e.code }] };
+  }
   var lines = content.split('\n');
   var size = Buffer.byteLength(content, 'utf-8');
 
@@ -117,7 +120,7 @@ function lintClaudeMd(dir) {
   }
 
   // Check for duplicate headings
-  var headings = {};
+  var headings = Object.create(null);
   for (var i = 0; i < lines.length; i++) {
     var hMatch = lines[i].match(/^(#{1,4})\s+(.+)/);
     if (hMatch) {
@@ -190,7 +193,10 @@ function lintAgentsMd(dir) {
     return { file: 'AGENTS.md', exists: false, issues: [] };
   }
 
-  var content = fs.readFileSync(filePath, 'utf-8');
+  var content;
+  try { content = fs.readFileSync(filePath, 'utf-8'); } catch (e) {
+    return { file: 'AGENTS.md', exists: true, size: 0, issues: [{ severity: 'error', message: 'Cannot read file: ' + e.code }] };
+  }
   var lines = content.split('\n');
   var size = Buffer.byteLength(content, 'utf-8');
 
@@ -243,7 +249,7 @@ function lintAgentsMd(dir) {
   }
 
   // Duplicate headings
-  var headings = {};
+  var headings = Object.create(null);
   for (var i = 0; i < lines.length; i++) {
     var hMatch = lines[i].match(/^(#{1,4})\s+(.+)/);
     if (hMatch) {
@@ -276,7 +282,8 @@ function lintAgentFiles(dir) {
   for (var i = 0; i < files.length; i++) {
     var issues = [];
     var filePath = path.join(agentsDir, files[i]);
-    var content = fs.readFileSync(filePath, 'utf-8');
+    var content;
+    try { content = fs.readFileSync(filePath, 'utf-8'); } catch (e) { continue; }
     var lines = content.split('\n');
     var size = Buffer.byteLength(content, 'utf-8');
 

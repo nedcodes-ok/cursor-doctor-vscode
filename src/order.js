@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 
 function parseFrontmatter(content) {
-  var match = content.match(/^---\n([\s\S]*?)\n---/);
+  var normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  var match = normalized.match(/^---\n([\s\S]*?)\n---/);
   if (!match) return { found: false, data: null };
   var data = {};
   var lines = match[1].split('\n');
@@ -135,8 +136,8 @@ function showLoadOrder(dir) {
   results.rules.sort((a, b) => {
     if (tierOrder[a.tier] !== tierOrder[b.tier]) return tierOrder[a.tier] - tierOrder[b.tier];
     // .cursorrules always last within 'always' tier (lowest priority)
-    if (a.file === '.cursorrules') return -1;
-    if (b.file === '.cursorrules') return 1;
+    if (a.file === '.cursorrules') return 1;
+    if (b.file === '.cursorrules') return -1;
     return a.file.localeCompare(b.file);
   });
 
