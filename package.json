@@ -73,5 +73,7 @@
         "configuration": "./language-configuration.json"
       }
     ]
-  }
+  },
+  "homepage": "https://nedcodes.dev",
+  "author": "nedcodes"
 }
