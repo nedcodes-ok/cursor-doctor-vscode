@@ -122,7 +122,13 @@ function similarity(textA, textB) {
 }
 
 async function lintMdcFile(filePath) {
-  const content = fs.readFileSync(filePath, 'utf-8');
+  const content = fs.readFileSync(filePath, 'utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // Skip binary files
+  if (/[\x00-\x08\x0E-\x1F]/.test(content.slice(0, 512))) {
+    return { file: filePath, issues: [{ severity: 'warning', message: 'File appears to be binary, not a text rule', hint: 'Remove non-text files from .cursor/rules/' }] };
+  }
+
   const issues = [];
 
   const fm = parseFrontmatter(content);
@@ -568,7 +574,7 @@ async function lintMdcFile(filePath) {
 }
 
 async function lintSkillFile(filePath) {
-  const content = fs.readFileSync(filePath, 'utf-8');
+  const content = fs.readFileSync(filePath, 'utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const issues = [];
 
   const fm = parseFrontmatter(content);
@@ -660,7 +666,7 @@ function collectSkillFiles(skillDirs) {
 }
 
 async function lintCursorrules(filePath) {
-  const content = fs.readFileSync(filePath, 'utf-8');
+  const content = fs.readFileSync(filePath, 'utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const issues = [];
 
   issues.push({
@@ -910,7 +916,7 @@ async function lintCursorConfig(dir) {
     const agentFiles = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'));
     for (const file of agentFiles) {
       const filePath = path.join(agentsDir, file);
-      const content = fs.readFileSync(filePath, 'utf-8');
+      const content = fs.readFileSync(filePath, 'utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
       // Agent files are plain markdown — frontmatter is optional
       // Just check they have content
@@ -994,7 +1000,7 @@ async function lintProject(dir) {
       const parsed = [];
       for (const file of mdcFiles) {
         const filePath = path.join(rulesDirPath, file);
-        const content = fs.readFileSync(filePath, 'utf-8');
+        const content = fs.readFileSync(filePath, 'utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         const body = getBody(content);
         const fm = parseFrontmatter(content);
         parsed.push({ file, filePath, body, description: fm.data && fm.data.description ? fm.data.description : undefined });
@@ -1139,7 +1145,7 @@ function detectConflicts(dir) {
   const parsed = [];
   for (const file of files) {
     const filePath = path.join(rulesDir, file);
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = fs.readFileSync(filePath, 'utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const fm = parseFrontmatter(content);
     const globs = fm.data ? parseGlobs(fm.data.globs) : [];
     const alwaysApply = fm.data && fm.data.alwaysApply;
