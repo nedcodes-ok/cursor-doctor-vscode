@@ -2,7 +2,7 @@
   "name": "cursor-doctor",
   "displayName": "Cursor Doctor",
   "description": "Diagnose and auto-fix your Cursor AI setup. Health grade in your status bar, inline diagnostics, and one-click repair.",
-  "version": "1.10.1",
+  "version": "1.10.2",
   "publisher": "nedcodes",
   "license": "MIT",
   "icon": "icon.png",
