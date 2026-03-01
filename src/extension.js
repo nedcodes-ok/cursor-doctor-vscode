@@ -468,6 +468,22 @@ async function cmdActivate() {
 
 async function cmdFixAllInFile(uri) {
   try {
+    var folders = vscode.workspace.workspaceFolders;
+    var dir = folders ? folders[0].uri.fsPath : '';
+    if (!isLicensed(dir)) {
+      var choice = await vscode.window.showWarningMessage(
+        'Cursor Doctor: Fix All is a Pro feature ($9 one-time). Individual quick fixes are free.',
+        'Get Pro License',
+        'Activate Key'
+      );
+      if (choice === 'Get Pro License') {
+        vscode.env.openExternal(vscode.Uri.parse(PURCHASE_URL_BASE + "?utm_source=vscode&utm_medium=extension&utm_campaign=fixall-paywall"));
+      } else if (choice === 'Activate Key') {
+        cmdActivate();
+      }
+      return;
+    }
+
     var document = await vscode.workspace.openTextDocument(uri);
     
     // Get all diagnostics for this file
