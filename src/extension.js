@@ -15,8 +15,13 @@ let diagnosticCollection;
 let statusBarItem;
 let lastReport = null;
 let debounceTimer = null;
+let outputChannel = null;
+let gradeUpdateTimer = null;
 
 function activate(context) {
+  outputChannel = vscode.window.createOutputChannel('Cursor Doctor');
+  context.subscriptions.push(outputChannel);
+
   diagnosticCollection = vscode.languages.createDiagnosticCollection('cursor-doctor');
   context.subscriptions.push(diagnosticCollection);
 
@@ -45,12 +50,12 @@ function activate(context) {
     vscode.commands.registerCommand('cursorDoctor.activate', cmdActivate)
   );
 
-  // Lint on save
+  // Lint on save (grade update debounced to avoid double-lint)
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(function (doc) {
       if (doc.fileName.endsWith('.mdc') || doc.fileName.endsWith('.cursorrules')) {
         lintSingleFile(doc);
-        updateHealthGrade();
+        scheduleGradeUpdate();
       }
     })
   );
@@ -88,7 +93,9 @@ function activate(context) {
     })
   );
 
-  // Run scan on activation
+  // Run scan on activation with loading indicator
+  statusBarItem.text = '$(sync~spin) Cursor Doctor';
+  statusBarItem.show();
   updateHealthGrade();
   lintWorkspace();
 
@@ -97,6 +104,20 @@ function activate(context) {
   if (!hasShown) {
     context.globalState.update(FIRST_RUN_KEY, true);
     showWelcomePanel();
+  }
+}
+
+function scheduleGradeUpdate() {
+  if (gradeUpdateTimer) clearTimeout(gradeUpdateTimer);
+  gradeUpdateTimer = setTimeout(function () {
+    gradeUpdateTimer = null;
+    updateHealthGrade();
+  }, 1000);
+}
+
+function log(msg) {
+  if (outputChannel) {
+    outputChannel.appendLine('[' + new Date().toLocaleTimeString() + '] ' + msg);
   }
 }
 
@@ -136,6 +157,7 @@ async function updateHealthGrade() {
 
     statusBarItem.show();
   } catch (e) {
+    log('Health grade update failed: ' + e.message);
     statusBarItem.text = '$(info) Cursor Doctor';
     statusBarItem.backgroundColor = undefined;
     statusBarItem.show();
@@ -168,7 +190,7 @@ function showScanReport(report) {
     'cursorDoctorScan',
     'Cursor Doctor: Health Report',
     vscode.ViewColumn.One,
-    { enableScripts: false }
+    { enableScripts: true }
   );
 
   var gradeColors = { A: '#4ec9b0', B: '#4ec9b0', C: '#cca700', D: '#cca700', F: '#f44747' };
@@ -211,8 +233,15 @@ function showScanReport(report) {
     + (fixable > 0 ? ' &nbsp; <span style="color:#cca700">' + fixable + ' fixable</span>' : '')
     + '</div>'
     + '<div class="checks">' + checksHtml + '</div>'
-    + (fixable > 0 ? '<div class="pro">💡 <strong>Auto-fix available</strong> — Run <code>Cursor Doctor: Auto-Fix</code> from the command palette.<br><span style="color:#999; font-size:12px;">Pro license required ($9 one-time) — <a href="' + PURCHASE_URL + '" style="color:#569cd6">' + PURCHASE_URL + '</a></span></div>' : '')
+    + (fixable > 0 ? '<div class="pro">💡 <strong>Auto-fix available</strong> — Run <code>Cursor Doctor: Auto-Fix</code> from the command palette.<br><span style="color:#999; font-size:12px;">Pro license required ($9 one-time) — <a href="#" onclick="openExternal(\'' + PURCHASE_URL + '\')" style="color:#569cd6; cursor:pointer;">Get Pro</a></span></div>' : '')
+    + '<script>const vscode = acquireVsCodeApi(); function openExternal(url) { vscode.postMessage({ command: "openExternal", url: url }); }</script>'
     + '</body></html>';
+
+  panel.webview.onDidReceiveMessage(function (message) {
+    if (message.command === 'openExternal' && message.url) {
+      vscode.env.openExternal(vscode.Uri.parse(message.url));
+    }
+  }, undefined, []);
 }
 
 function escapeHtml(s) {
@@ -259,7 +288,7 @@ async function lintWorkspace() {
           else totalWarnings++;
         }
       }
-    } catch (e) { /* skip */ }
+    } catch (e) { log('Lint workspace error: ' + e.message); }
   }
 
   if (totalErrors > 0 || totalWarnings > 0) {
@@ -288,9 +317,6 @@ async function lintSingleFile(document) {
 
   var diagnostics = issuesToDiagnostics(result.issues, document);
   diagnosticCollection.set(document.uri, diagnostics);
-  
-  // Update status bar with new issue count
-  updateHealthGrade();
 }
 
 function issuesToDiagnostics(issues, document) {
@@ -484,52 +510,43 @@ async function cmdFixAllInFile(uri) {
       return;
     }
 
-    var document = await vscode.workspace.openTextDocument(uri);
-    
-    // Get all diagnostics for this file
-    var allDiagnostics = diagnosticCollection.get(uri) || [];
-    var fixableDiags = allDiagnostics.filter(function(d) { return d.code; });
-    
-    if (fixableDiags.length === 0) {
-      vscode.window.showInformationMessage('Cursor Doctor: No auto-fixable issues found');
-      return;
-    }
-    
     var appliedFixes = 0;
-    var { CursorDoctorCodeActionProvider } = require('./codeactions');
     var provider = new CursorDoctorCodeActionProvider();
-    
-    // Apply each fix in sequence by re-reading the document
-    for (var i = 0; i < fixableDiags.length; i++) {
-      var diag = fixableDiags[i];
+    var MAX_PASSES = 20;
+
+    // Iterative fix: apply one fix at a time, re-lint after each to get fresh ranges
+    for (var pass = 0; pass < MAX_PASSES; pass++) {
       var currentDoc = await vscode.workspace.openTextDocument(uri);
+      await lintSingleFile(currentDoc);
       
-      // Get fixes for this diagnostic using the provider
-      var fakeContext = {
-        diagnostics: [diag],
-        only: undefined,
-        triggerKind: 1
-      };
-      var actions = provider.provideCodeActions(currentDoc, diag.range, fakeContext) || [];
-      var fixes = actions.filter(function(a) { 
-        return a.diagnostics && a.diagnostics.includes(diag) && a.edit; 
-      });
+      var allDiagnostics = diagnosticCollection.get(uri) || [];
+      var fixableDiags = allDiagnostics.filter(function(d) { return d.code; });
       
-      if (fixes.length > 0) {
-        var fix = fixes[0]; // Use the first (preferred) fix
-        if (fix.edit) {
-          await vscode.workspace.applyEdit(fix.edit);
+      if (fixableDiags.length === 0) break;
+
+      var fixed = false;
+      for (var i = 0; i < fixableDiags.length; i++) {
+        var diag = fixableDiags[i];
+        var fakeContext = { diagnostics: [diag], only: undefined, triggerKind: 1 };
+        var actions = provider.provideCodeActions(currentDoc, diag.range, fakeContext) || [];
+        var fixes = actions.filter(function(a) { return a.edit; });
+        
+        if (fixes.length > 0) {
+          await vscode.workspace.applyEdit(fixes[0].edit);
           appliedFixes++;
+          fixed = true;
+          break; // Re-lint before next fix to get fresh ranges
         }
       }
+      
+      if (!fixed) break; // No fixable diagnostics left
     }
     
     if (appliedFixes > 0) {
-      vscode.window.showInformationMessage('Cursor Doctor: Applied ' + appliedFixes + ' fix' + (appliedFixes !== 1 ? 'es' : ''));
-      
-      // Re-lint the file
+      // Final re-lint
       var updatedDoc = await vscode.workspace.openTextDocument(uri);
       await lintSingleFile(updatedDoc);
+      vscode.window.showInformationMessage('Cursor Doctor: Applied ' + appliedFixes + ' fix' + (appliedFixes !== 1 ? 'es' : ''));
     } else {
       vscode.window.showInformationMessage('Cursor Doctor: No auto-fixable issues found');
     }
@@ -579,17 +596,26 @@ function showWelcomePanel() {
     + '<h3>Auto-fix everything <span class="pro-badge">PRO</span></h3>'
     + '<p>Run <code>Cursor Doctor: Auto-Fix</code> to repair frontmatter, merge redundant rules, resolve conflicts, and generate starter rules for your stack. One command, clean setup.</p>'
     + '</div></div>'
-    + '<div class="cta"><a href="' + PURCHASE_URL_BASE + '?utm_source=vscode&utm_medium=extension&utm_campaign=welcome-panel">Get Pro — $9 one-time</a></div>'
+    + '<div class="cta"><a href="#" onclick="openExternal(\'' + PURCHASE_URL_BASE + '?utm_source=vscode&utm_medium=extension&utm_campaign=welcome-panel\')" style="display:inline-block; background:#4ec9b0; color:#1e1e1e; text-decoration:none; padding:10px 24px; border-radius:6px; font-weight:bold; font-size:14px; cursor:pointer;">Get Pro — $9 one-time</a></div>'
     + '<div class="footer">Free: scan, lint, diagnostics, migrate · Pro: auto-fix, generate, conflict resolution<br><br>'
-    + '<a href="https://github.com/nedcodes-ok/cursor-doctor" style="color:#569cd6">GitHub</a> · '
-    + '<a href="https://www.npmjs.com/package/cursor-doctor" style="color:#569cd6">npm</a></div>'
+    + '<a href="#" onclick="openExternal(\'https://github.com/nedcodes-ok/cursor-doctor\')" style="color:#569cd6; cursor:pointer;">GitHub</a> · '
+    + '<a href="#" onclick="openExternal(\'https://www.npmjs.com/package/cursor-doctor\')" style="color:#569cd6; cursor:pointer;">npm</a></div>'
+    + '<script>const vscode = acquireVsCodeApi(); function openExternal(url) { vscode.postMessage({ command: "openExternal", url: url }); }</script>'
     + '</body></html>';
+
+  panel.webview.onDidReceiveMessage(function (message) {
+    if (message.command === 'openExternal' && message.url) {
+      vscode.env.openExternal(vscode.Uri.parse(message.url));
+    }
+  }, undefined, []);
 }
 
 function deactivate() {
   if (debounceTimer) clearTimeout(debounceTimer);
+  if (gradeUpdateTimer) clearTimeout(gradeUpdateTimer);
   if (diagnosticCollection) diagnosticCollection.dispose();
   if (statusBarItem) statusBarItem.dispose();
+  if (outputChannel) outputChannel.dispose();
 }
 
 module.exports = { activate, deactivate };

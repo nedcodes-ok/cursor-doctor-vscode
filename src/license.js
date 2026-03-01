@@ -12,7 +12,7 @@ function getLicensePath() {
   return path.join(home, LICENSE_FILE);
 }
 
-function isLicensed() {
+function isLicensed(dir) {
   var p = getLicensePath();
   if (!fs.existsSync(p)) return false;
   try {

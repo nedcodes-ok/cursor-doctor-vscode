@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { lintProject } = require('./index');
+const { lintProject } = require('./linter');
 const { showStats } = require('./stats');
 const { lintPlugin } = require('./plugin');
 const { analyzeTokenBudget, CONTEXT_WINDOW_TOKENS } = require('./token-budget');
