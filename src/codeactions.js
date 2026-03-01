@@ -1,10 +1,14 @@
 const vscode = require('vscode');
+const { isLicensed } = require('./license');
 
 const PURCHASE_URL = 'https://nedcodes.gumroad.com/l/cursor-doctor-pro?utm_source=vscode&utm_medium=extension&utm_campaign=codeaction';
 
 class CursorDoctorCodeActionProvider {
   provideCodeActions(document, range, context) {
     var actions = [];
+    var folders = vscode.workspace.workspaceFolders;
+    var dir = folders ? folders[0].uri.fsPath : '';
+    var licensed = isLicensed(dir);
 
     for (var i = 0; i < context.diagnostics.length; i++) {
       var diag = context.diagnostics[i];
@@ -13,9 +17,24 @@ class CursorDoctorCodeActionProvider {
       var code = diag.code;
       if (!code) continue;
 
-      var fixes = getFixesForCode(code, document, diag);
-      for (var j = 0; j < fixes.length; j++) {
-        actions.push(fixes[j]);
+      if (licensed) {
+        var fixes = getFixesForCode(code, document, diag);
+        for (var j = 0; j < fixes.length; j++) {
+          actions.push(fixes[j]);
+        }
+      } else {
+        // Show Pro upsell action instead of actual fix
+        var proAction = new vscode.CodeAction(
+          '🔒 Auto-fix: ' + code + ' (Pro)',
+          vscode.CodeActionKind.QuickFix
+        );
+        proAction.diagnostics = [diag];
+        proAction.command = {
+          command: 'vscode.open',
+          title: 'Get Pro',
+          arguments: [vscode.Uri.parse(PURCHASE_URL)]
+        };
+        actions.push(proAction);
       }
     }
 
@@ -23,7 +42,7 @@ class CursorDoctorCodeActionProvider {
     var fileDiagnostics = context.diagnostics.filter(function (d) { return d.source === 'cursor-doctor'; });
     if (fileDiagnostics.length > 0) {
       var fixAllAction = new vscode.CodeAction(
-        'Fix all issues in this file',
+        licensed ? 'Fix all issues in this file' : '🔒 Fix all issues in this file (Pro)',
         vscode.CodeActionKind.QuickFix
       );
       fixAllAction.diagnostics = fileDiagnostics;
