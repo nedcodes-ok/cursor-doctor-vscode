@@ -14,6 +14,7 @@ const FIRST_RUN_KEY = 'cursorDoctor.hasShownWelcome';
 let diagnosticCollection;
 let statusBarItem;
 let lastReport = null;
+let debounceTimer = null;
 
 function activate(context) {
   diagnosticCollection = vscode.languages.createDiagnosticCollection('cursor-doctor');
@@ -64,7 +65,6 @@ function activate(context) {
   );
 
   // Lint on text change (debounced)
-  var debounceTimer = null;
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument(function (event) {
       var doc = event.document;
@@ -74,6 +74,16 @@ function activate(context) {
           lintSingleFile(doc);
           debounceTimer = null;
         }, 500);
+      }
+    })
+  );
+
+  // Clear diagnostics when file is closed
+  context.subscriptions.push(
+    vscode.workspace.onDidCloseTextDocument(function (doc) {
+      if (doc.fileName.endsWith('.mdc') || doc.fileName.endsWith('.cursorrules')) {
+        diagnosticCollection.delete(doc.uri);
+        updateHealthGrade();
       }
     })
   );
@@ -284,10 +294,17 @@ async function lintSingleFile(document) {
 }
 
 function issuesToDiagnostics(issues, document) {
+  // Guard against empty documents
+  if (document.lineCount === 0) {
+    return [];
+  }
+
   return issues.map(function (issue) {
     var line = issue.line ? issue.line - 1 : 0;
     var maxLine = document.lineCount - 1;
     if (line > maxLine) line = maxLine;
+    if (line < 0) line = 0;
+    
     var range = new vscode.Range(
       new vscode.Position(line, 0),
       new vscode.Position(line, document.lineAt(line).text.length)
@@ -452,68 +469,47 @@ async function cmdActivate() {
 async function cmdFixAllInFile(uri) {
   try {
     var document = await vscode.workspace.openTextDocument(uri);
-    var text = document.getText();
     
-    // Import all the fixer functions from CLI autofix.js
-    var {
-      fixBooleanStrings,
-      fixFrontmatterTabs,
-      fixCommaSeparatedGlobs,
-      fixEmptyGlobsArray,
-      fixDescriptionMarkdown,
-      fixUnknownFrontmatterKeys,
-      fixDescriptionRule,
-      fixExcessiveBlankLines,
-      fixTrailingWhitespace,
-      fixPleaseThankYou,
-      fixFirstPerson,
-      fixCommentedHTML,
-      fixUnclosedCodeBlocks,
-      fixInconsistentListMarkers,
-      fixGlobBackslashes,
-      fixGlobTrailingSlash,
-      fixGlobDotSlash,
-      fixGlobRegexSyntax,
-    } = require('./linter-fixers');
+    // Get all diagnostics for this file
+    var allDiagnostics = diagnosticCollection.get(uri) || [];
+    var fixableDiags = allDiagnostics.filter(function(d) { return d.code; });
     
-    var fixers = [
-      fixBooleanStrings,
-      fixFrontmatterTabs,
-      fixCommaSeparatedGlobs,
-      fixEmptyGlobsArray,
-      fixDescriptionMarkdown,
-      fixUnknownFrontmatterKeys,
-      fixDescriptionRule,
-      fixExcessiveBlankLines,
-      fixTrailingWhitespace,
-      fixPleaseThankYou,
-      fixFirstPerson,
-      fixCommentedHTML,
-      fixUnclosedCodeBlocks,
-      fixInconsistentListMarkers,
-      fixGlobRegexSyntax,
-      fixGlobBackslashes,
-      fixGlobTrailingSlash,
-      fixGlobDotSlash,
-    ];
-    
-    var allChanges = [];
-    for (var i = 0; i < fixers.length; i++) {
-      var result = fixers[i](text);
-      text = result.content;
-      allChanges.push(...result.changes);
+    if (fixableDiags.length === 0) {
+      vscode.window.showInformationMessage('Cursor Doctor: No auto-fixable issues found');
+      return;
     }
     
-    if (allChanges.length > 0) {
-      var edit = new vscode.WorkspaceEdit();
-      var fullRange = new vscode.Range(
-        new vscode.Position(0, 0),
-        new vscode.Position(document.lineCount, 0)
-      );
-      edit.replace(uri, fullRange, text);
+    var appliedFixes = 0;
+    var { CursorDoctorCodeActionProvider } = require('./codeactions');
+    var provider = new CursorDoctorCodeActionProvider();
+    
+    // Apply each fix in sequence by re-reading the document
+    for (var i = 0; i < fixableDiags.length; i++) {
+      var diag = fixableDiags[i];
+      var currentDoc = await vscode.workspace.openTextDocument(uri);
       
-      await vscode.workspace.applyEdit(edit);
-      vscode.window.showInformationMessage('Cursor Doctor: Applied ' + allChanges.length + ' fix' + (allChanges.length !== 1 ? 'es' : ''));
+      // Get fixes for this diagnostic using the provider
+      var fakeContext = {
+        diagnostics: [diag],
+        only: undefined,
+        triggerKind: 1
+      };
+      var actions = provider.provideCodeActions(currentDoc, diag.range, fakeContext) || [];
+      var fixes = actions.filter(function(a) { 
+        return a.diagnostics && a.diagnostics.includes(diag) && a.edit; 
+      });
+      
+      if (fixes.length > 0) {
+        var fix = fixes[0]; // Use the first (preferred) fix
+        if (fix.edit) {
+          await vscode.workspace.applyEdit(fix.edit);
+          appliedFixes++;
+        }
+      }
+    }
+    
+    if (appliedFixes > 0) {
+      vscode.window.showInformationMessage('Cursor Doctor: Applied ' + appliedFixes + ' fix' + (appliedFixes !== 1 ? 'es' : ''));
       
       // Re-lint the file
       var updatedDoc = await vscode.workspace.openTextDocument(uri);
@@ -575,6 +571,7 @@ function showWelcomePanel() {
 }
 
 function deactivate() {
+  if (debounceTimer) clearTimeout(debounceTimer);
   if (diagnosticCollection) diagnosticCollection.dispose();
   if (statusBarItem) statusBarItem.dispose();
 }

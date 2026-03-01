@@ -140,7 +140,9 @@ function getFixesForCode(code, document, diag) {
       var fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
       if (fmMatch) {
         var yaml = fmMatch[1];
-        var fixedYaml = yaml.replace(/^(alwaysApply:\s*)["']?(true|false)["']?\s*$/m, '$1$2');
+        var fixedYaml = yaml.replace(/^(alwaysApply:\s*)["']?(true|false|True|False|TRUE|FALSE)["']?\s*$/mi, function(match, prefix, value) {
+          return prefix + value.toLowerCase();
+        });
         
         if (fixedYaml !== yaml) {
           var action = new vscode.CodeAction(
@@ -152,10 +154,10 @@ function getFixesForCode(code, document, diag) {
           action.edit = new vscode.WorkspaceEdit();
           
           var fmStartLine = 0;
-          var fmEndLine = findFrontmatterEndLine(text) + 1;
+          var fmEndLine = findFrontmatterEndLine(text);
           var range = new vscode.Range(
             new vscode.Position(fmStartLine, 0),
-            new vscode.Position(fmEndLine, 0)
+            new vscode.Position(fmEndLine + 1, 0)
           );
           action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
           actions.push(action);
@@ -182,10 +184,10 @@ function getFixesForCode(code, document, diag) {
         action.edit = new vscode.WorkspaceEdit();
         
         var fmStartLine = 0;
-        var fmEndLine = findFrontmatterEndLine(text) + 1;
+        var fmEndLine = findFrontmatterEndLine(text);
         var range = new vscode.Range(
           new vscode.Position(fmStartLine, 0),
-          new vscode.Position(fmEndLine, 0)
+          new vscode.Position(fmEndLine + 1, 0)
         );
         action.edit.replace(document.uri, range, '---\n' + fixed + '\n---\n');
         actions.push(action);
@@ -207,20 +209,30 @@ function getFixesForCode(code, document, diag) {
       var fixedLines = lines.map(function(line) {
         var trimmed = line.trim();
         
-        // Lines starting with "Thank you" / "Thanks" — remove entirely
-        if (/^thank\s*(you|s)\b/i.test(trimmed)) {
+        // Lines that are ONLY "Thank you" / "Thanks" — remove entirely
+        if (/^thank\s*(you|s)[.!]?\s*$/i.test(trimmed)) {
           return null;
         }
         
-        // "Please X" at start of line → "X" (capitalize first word)
+        // Standalone politeness lines like "Please note:" or just "Please" — remove
+        if (/^please[.!:]?\s*$/i.test(trimmed)) {
+          return null;
+        }
+        
+        // "Please X" at start of line where X is an imperative → "X" (capitalize first word)
         if (/^please\s+/i.test(trimmed)) {
           var rest = trimmed.replace(/^please\s+/i, '');
           return line.replace(trimmed, rest.charAt(0).toUpperCase() + rest.slice(1));
         }
         
-        // "X please" at end → "X"
+        // "X please" at end → "X" (but only if it's clearly at the end)
         if (/\s+please[.!]?\s*$/i.test(trimmed)) {
           return line.replace(/,?\s+please([.!]?)\s*$/i, '$1');
+        }
+        
+        // Inline "please " → remove just the word
+        if (/\bplease\s+/i.test(line)) {
+          return line.replace(/\bplease\s+/gi, '');
         }
         
         return line;
@@ -360,10 +372,10 @@ function getFixesForCode(code, document, diag) {
           action.edit = new vscode.WorkspaceEdit();
           
           var fmStartLine = 0;
-          var fmEndLine = findFrontmatterEndLine(text) + 1;
+          var fmEndLine = findFrontmatterEndLine(text);
           var range = new vscode.Range(
             new vscode.Position(fmStartLine, 0),
-            new vscode.Position(fmEndLine, 0)
+            new vscode.Position(fmEndLine + 1, 0)
           );
           action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
           actions.push(action);
@@ -389,10 +401,10 @@ function getFixesForCode(code, document, diag) {
           action.edit = new vscode.WorkspaceEdit();
           
           var fmStartLine = 0;
-          var fmEndLine = findFrontmatterEndLine(text) + 1;
+          var fmEndLine = findFrontmatterEndLine(text);
           var range = new vscode.Range(
             new vscode.Position(fmStartLine, 0),
-            new vscode.Position(fmEndLine, 0)
+            new vscode.Position(fmEndLine + 1, 0)
           );
           action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
           actions.push(action);
@@ -418,10 +430,10 @@ function getFixesForCode(code, document, diag) {
           action.edit = new vscode.WorkspaceEdit();
           
           var fmStartLine = 0;
-          var fmEndLine = findFrontmatterEndLine(text) + 1;
+          var fmEndLine = findFrontmatterEndLine(text);
           var range = new vscode.Range(
             new vscode.Position(fmStartLine, 0),
-            new vscode.Position(fmEndLine, 0)
+            new vscode.Position(fmEndLine + 1, 0)
           );
           action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
           actions.push(action);
@@ -467,10 +479,10 @@ function getFixesForCode(code, document, diag) {
           action.edit = new vscode.WorkspaceEdit();
           
           var fmStartLine = 0;
-          var fmEndLine = findFrontmatterEndLine(text) + 1;
+          var fmEndLine = findFrontmatterEndLine(text);
           var range = new vscode.Range(
             new vscode.Position(fmStartLine, 0),
-            new vscode.Position(fmEndLine, 0)
+            new vscode.Position(fmEndLine + 1, 0)
           );
           action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
           actions.push(action);
@@ -507,10 +519,10 @@ function getFixesForCode(code, document, diag) {
           action.edit = new vscode.WorkspaceEdit();
           
           var fmStartLine = 0;
-          var fmEndLine = findFrontmatterEndLine(text) + 1;
+          var fmEndLine = findFrontmatterEndLine(text);
           var range = new vscode.Range(
             new vscode.Position(fmStartLine, 0),
-            new vscode.Position(fmEndLine, 0)
+            new vscode.Position(fmEndLine + 1, 0)
           );
           action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
           actions.push(action);

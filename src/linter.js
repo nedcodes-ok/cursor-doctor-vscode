@@ -41,7 +41,7 @@ function findVagueRules(content) {
       if (after.startsWith('with ') || after.startsWith('for ') || after.startsWith('in ') ||
           after.startsWith('by ') || after.startsWith('using ') || after.startsWith('according to ') ||
           after.startsWith('and ')) continue;
-      issues.push({ severity: 'warning', message: `Vague rule detected: "${pattern}"`, line: vi + 1 });
+      issues.push({ severity: 'warning', message: `Vague rule detected: "${pattern}"`, line: vi + 1, code: 'vague-rule' });
       break;
     }
   }
@@ -172,7 +172,7 @@ async function lintMdcFile(filePath) {
     // Non-functional rule: alwaysApply is explicitly false and no globs
     if (fm.data.alwaysApply === false && !hasGlobs) {
       const line = findLineInFrontmatter(content, 'alwaysApply') || 2;
-      issues.push({ severity: 'error', message: 'Rule will never load: alwaysApply is false and no globs are set', hint: 'Set alwaysApply: true for global rules, or add globs to scope to specific files', line });
+      issues.push({ severity: 'error', message: 'Rule will never load: alwaysApply is false and no globs are set', hint: 'Set alwaysApply: true for global rules, or add globs to scope to specific files', line, code: 'non-functional-rule' });
     }
     if (fm.data.globs && typeof fm.data.globs === 'string' && fm.data.globs.includes(',') && !fm.data.globs.trim().startsWith('[')) {
       const line = findLineInFrontmatter(content, 'globs') || 2;
@@ -245,6 +245,7 @@ async function lintMdcFile(filePath) {
       severity: 'warning',
       message: 'Rule body is very long (>2000 chars, ~500+ tokens)',
       hint: 'Shorter, specific rules outperform long generic ones. Consider splitting into focused rules.',
+      code: 'rule-too-long',
     });
   }
 
@@ -254,6 +255,7 @@ async function lintMdcFile(filePath) {
       severity: 'error',
       message: 'Rule body exceeds 5000 chars (~1250 tokens)',
       hint: 'Rules this long waste context and confuse the model. Split into multiple focused rules.',
+      code: 'rule-oversized',
     });
   }
 
@@ -264,6 +266,7 @@ async function lintMdcFile(filePath) {
       severity: 'warning',
       message: 'Rule has no code examples',
       hint: 'Rules with examples get followed more reliably by the AI model.',
+      code: 'no-examples',
     });
   }
 
@@ -286,6 +289,7 @@ async function lintMdcFile(filePath) {
       severity: 'warning',
       message: 'Description is very short (<10 chars)',
       hint: 'A descriptive description helps Cursor decide when to apply this rule.',
+      code: 'description-too-short',
     });
   }
 
@@ -295,6 +299,7 @@ async function lintMdcFile(filePath) {
       severity: 'warning',
       message: 'Description is very long (>200 chars)',
       hint: 'Keep descriptions concise. Put detailed instructions in the rule body, not the description.',
+      code: 'description-too-long',
     });
   }
 
@@ -308,6 +313,7 @@ async function lintMdcFile(filePath) {
           severity: 'warning',
           message: 'Overly broad glob pattern',
           hint: 'This matches everything. Consider using more specific patterns or just alwaysApply: true.',
+          code: 'broad-glob',
         });
       }
       // Glob contains spaces
@@ -316,6 +322,7 @@ async function lintMdcFile(filePath) {
           severity: 'warning',
           message: 'Glob pattern contains spaces',
           hint: 'Glob patterns with spaces may not match correctly.',
+          code: 'glob-spaces',
         });
       }
       // Glob is *.
@@ -323,6 +330,7 @@ async function lintMdcFile(filePath) {
         issues.push({
           severity: 'warning',
           message: 'Glob pattern has no file extension after dot',
+          code: 'glob-no-extension',
         });
       }
 
@@ -375,6 +383,7 @@ async function lintMdcFile(filePath) {
           severity: 'info',
           message: `Multiple globs could be simplified: ${globs.join(', ')}`,
           hint: `Consider using ["*.{${extensions.join(',')}}"] for cleaner syntax.`,
+          code: 'glob-simplify',
         });
       }
     }
@@ -388,6 +397,7 @@ async function lintMdcFile(filePath) {
         severity: 'info',
         message: 'alwaysApply is true with globs set',
         hint: 'When alwaysApply is true, globs serve as a hint to the model but don\'t filter. This is fine if intentional.',
+        code: 'alwaysapply-with-globs',
       });
     }
   }
@@ -403,6 +413,7 @@ async function lintMdcFile(filePath) {
         severity: 'warning',
         message: 'Rule body appears to be just a URL',
         hint: 'Cursor cannot follow URLs. Put the actual instructions in the rule body.',
+        code: 'body-just-url',
       });
     }
   }
@@ -417,6 +428,7 @@ async function lintMdcFile(filePath) {
         severity: 'warning',
         message: 'Rule body contains XML/HTML tags',
         hint: 'Cursor doesn\'t process XML/HTML in rules. Use markdown or plain text instead.',
+        code: 'xml-tags',
       });
     }
   }
@@ -427,6 +439,7 @@ async function lintMdcFile(filePath) {
       severity: 'warning',
       message: 'Rule body has broken markdown links',
       hint: 'Fix link syntax: [text](url)',
+      code: 'broken-links',
     });
   }
 
@@ -436,6 +449,7 @@ async function lintMdcFile(filePath) {
       severity: 'warning',
       message: 'Rule body starts with description repeated',
       hint: 'Redundant content wastes tokens. Remove the duplicate description from the body.',
+      code: 'duplicate-description',
     });
   }
 
@@ -445,6 +459,7 @@ async function lintMdcFile(filePath) {
       severity: 'warning',
       message: 'Rule contains TODO/FIXME/HACK comments',
       hint: 'Unfinished rules confuse the model. Finish the rule or remove it.',
+      code: 'todo-comments',
     });
   }
 
@@ -465,6 +480,7 @@ async function lintMdcFile(filePath) {
         severity: 'warning',
         message: 'Rule has inconsistent heading levels (jumps from # to ###)',
         hint: 'Use consistent heading hierarchy for better structure.',
+        code: 'inconsistent-headings',
       });
     }
   }
@@ -533,68 +549,6 @@ async function lintMdcFile(filePath) {
     });
   }
 
-  // Rule has trailing whitespace
-  const lines = content.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i] !== lines[i].trimEnd()) {
-      issues.push({
-        severity: 'info',
-        message: 'Rule has trailing whitespace',
-        hint: 'Trailing whitespace wastes bytes. Clean it up.',
-        line: i + 1,
-        code: 'trailing-whitespace',
-      });
-      break; // Only report once
-    }
-  }
-
-  // HTML comments in body
-  if (/<!--[\s\S]*?-->/.test(body)) {
-    const match = body.match(/<!--/);
-    if (match) {
-      const bodyLines = body.split('\n');
-      let line = 1;
-      for (let i = 0; i < bodyLines.length; i++) {
-        if (bodyLines[i].includes('<!--')) {
-          line = i + 1;
-          // Adjust for frontmatter offset
-          const fmLines = (content.match(/^---\n[\s\S]*?\n---\n?/) || [''])[0].split('\n').length;
-          line += fmLines;
-          break;
-        }
-      }
-      issues.push({
-        severity: 'warning',
-        message: 'Rule body contains HTML comments',
-        hint: 'Remove commented-out sections. They waste tokens and confuse the model.',
-        line,
-        code: 'html-comments',
-      });
-    }
-  }
-
-  // Unclosed code blocks
-  const codeBlockMarkers = body.match(/```/g);
-  if (codeBlockMarkers && codeBlockMarkers.length % 2 !== 0) {
-    const bodyLines = body.split('\n');
-    let line = 1;
-    for (let i = 0; i < bodyLines.length; i++) {
-      if (bodyLines[i].includes('```')) {
-        line = i + 1;
-        const fmLines = (content.match(/^---\n[\s\S]*?\n---\n?/) || [''])[0].split('\n').length;
-        line += fmLines;
-        break;
-      }
-    }
-    issues.push({
-      severity: 'error',
-      message: 'Unclosed code block (odd number of ``` markers)',
-      hint: 'Add closing ``` to match the opening code block.',
-      line,
-      code: 'unclosed-code-block',
-    });
-  }
-
   // Rule uses numbered lists where order doesn't matter
   const numberedLists = body.match(/\n\d+\.\s+/g);
   if (numberedLists && numberedLists.length >= 5) {
@@ -606,6 +560,7 @@ async function lintMdcFile(filePath) {
         severity: 'info',
         message: 'Rule uses numbered lists where order may not matter',
         hint: 'Bullet lists are more flexible for AI and clearer when order is unimportant.',
+        code: 'numbered-list',
       });
     }
   }
@@ -622,6 +577,7 @@ async function lintMdcFile(filePath) {
         severity: 'warning',
         message: `Rule uses weak language: "${example}"`,
         hint: 'AI models follow commands better than suggestions. Use imperative mood: "Do X" instead of "try to do X".',
+        code: 'weak-language',
       });
     }
   }
@@ -636,6 +592,7 @@ async function lintMdcFile(filePath) {
         severity: 'warning',
         message: 'Rule uses negations without alternatives',
         hint: 'Instead of "don\'t use X", say "use Y instead of X" to give the model clear direction.',
+        code: 'negation-no-alternative',
       });
     }
   }
@@ -647,6 +604,7 @@ async function lintMdcFile(filePath) {
       severity: 'warning',
       message: 'Rule has no clear actionable instructions',
       hint: 'Rules should contain clear commands. Use imperative verbs: use, write, create, ensure, etc.',
+      code: 'no-actionable-instructions',
     });
   }
 
@@ -700,6 +658,7 @@ async function lintMdcFile(filePath) {
             severity: 'info',
             message: 'Rule references file that may not exist: ' + fpRef,
             hint: 'Verify this file path is correct or remove the reference if outdated.',
+            code: 'missing-file-reference',
           });
         }
       }
@@ -727,6 +686,7 @@ async function lintMdcFile(filePath) {
       severity: 'warning',
       message: `Rule mixes multiple concerns: ${matchedConcerns.join(', ')}`,
       hint: 'Rules that cover too many topics are harder for the AI to apply correctly. Split into focused rules.',
+      code: 'mixed-concerns',
     });
   }
 
@@ -746,6 +706,7 @@ async function lintMdcFile(filePath) {
         severity: 'error',
         message: `Rule has conflicting instructions about ${subject}`,
         hint: `Rule contains both "${a}" and "${b}". Choose one approach.`,
+        code: 'internal-conflict',
       });
     }
   }
@@ -760,19 +721,19 @@ async function lintSkillFile(filePath) {
   const fm = parseFrontmatter(content);
 
   if (!fm.found) {
-    issues.push({ severity: 'error', message: 'Missing YAML frontmatter', hint: 'Add --- block with name and description fields' });
+    issues.push({ severity: 'error', message: 'Missing YAML frontmatter', hint: 'Add --- block with name and description fields', code: 'skill-missing-frontmatter' });
   } else if (fm.error) {
-    issues.push({ severity: 'error', message: `YAML frontmatter error: ${fm.error}`, hint: 'Fix frontmatter syntax' });
+    issues.push({ severity: 'error', message: `YAML frontmatter error: ${fm.error}`, hint: 'Fix frontmatter syntax', code: 'skill-frontmatter-error' });
   } else {
     if (!fm.data.name) {
-      issues.push({ severity: 'error', message: 'Missing name in frontmatter', hint: 'Add name: your-skill-name to frontmatter' });
+      issues.push({ severity: 'error', message: 'Missing name in frontmatter', hint: 'Add name: your-skill-name to frontmatter', code: 'skill-missing-name' });
     }
     var descEmpty = !fm.data.description || (typeof fm.data.description === 'string' && fm.data.description.trim() === '') || (Array.isArray(fm.data.description) && fm.data.description.length === 0);
     if (descEmpty) {
-      issues.push({ severity: 'error', message: 'Missing description in frontmatter', hint: 'Add a description so the agent knows when to use this skill' });
+      issues.push({ severity: 'error', message: 'Missing description in frontmatter', hint: 'Add a description so the agent knows when to use this skill', code: 'skill-missing-description' });
     }
     if (fm.data.description && fm.data.description.length < 20) {
-      issues.push({ severity: 'warning', message: 'Description is very short', hint: 'A longer description helps agents understand when to invoke this skill' });
+      issues.push({ severity: 'warning', message: 'Description is very short', hint: 'A longer description helps agents understand when to invoke this skill', code: 'skill-description-short' });
     }
   }
 
@@ -780,15 +741,15 @@ async function lintSkillFile(filePath) {
   const body = fm.found ? content.replace(/^---\n[\s\S]*?\n---\n?/, '') : content;
 
   if (body.trim().length === 0) {
-    issues.push({ severity: 'error', message: 'Skill file has no body content', hint: 'Add instructions for the agent after the frontmatter' });
+    issues.push({ severity: 'error', message: 'Skill file has no body content', hint: 'Add instructions for the agent after the frontmatter', code: 'skill-empty-body' });
   } else if (body.trim().length < 50) {
-    issues.push({ severity: 'warning', message: 'Skill body is very short (< 50 chars)', hint: 'Skills with more detail produce better agent behavior' });
+    issues.push({ severity: 'warning', message: 'Skill body is very short (< 50 chars)', hint: 'Skills with more detail produce better agent behavior', code: 'skill-body-short' });
   }
 
   // Check for headings (structure)
   const headings = body.match(/^#{1,3}\s+.+/gm);
   if (body.trim().length > 500 && (!headings || headings.length === 0)) {
-    issues.push({ severity: 'warning', message: 'Long skill with no headings', hint: 'Add ## sections to organize instructions for better agent comprehension' });
+    issues.push({ severity: 'warning', message: 'Long skill with no headings', hint: 'Add ## sections to organize instructions for better agent comprehension', code: 'skill-no-headings' });
   }
 
   // Vague rules (context-aware)
@@ -847,6 +808,7 @@ async function lintCursorrules(filePath) {
     severity: 'warning',
     message: '.cursorrules may be ignored in agent mode',
     hint: 'Use .cursor/rules/*.mdc with alwaysApply: true for agent mode compatibility',
+    code: 'legacy-cursorrules',
   });
 
   // Vague rules (context-aware)
@@ -877,6 +839,7 @@ async function lintProjectStructure(dir) {
       severity: 'warning',
       message: `${mdcFiles.length} rules with no subdirectory organization`,
       hint: 'Organize rules into subdirectories (e.g., .cursor/rules/typescript/, .cursor/rules/react/) for better maintainability.',
+      code: 'no-subdirectory-org',
     });
   }
 
@@ -888,6 +851,7 @@ async function lintProjectStructure(dir) {
         severity: 'info',
         message: `Filename not in kebab-case: ${file}`,
         hint: 'Use kebab-case for consistency: my-rule.mdc instead of MyRule.mdc or my_rule.mdc.',
+        code: 'filename-not-kebab',
       });
     }
   }
@@ -900,6 +864,7 @@ async function lintProjectStructure(dir) {
         severity: 'warning',
         message: `Generic filename: ${generic}`,
         hint: 'Use descriptive names that indicate what the rule does (e.g., react-hooks.mdc, typescript-naming.mdc).',
+        code: 'generic-filename',
       });
     }
   }
@@ -916,6 +881,7 @@ async function lintProjectStructure(dir) {
           severity: 'warning',
           message: `Similar filenames: ${mdcFiles[i]} and ${mdcFiles[j]}`,
           hint: 'These filenames are very similar. Consider consolidating or renaming for clarity.',
+          code: 'similar-filenames',
         });
       }
     }
@@ -934,6 +900,7 @@ async function lintProjectStructure(dir) {
           severity: 'info',
           message: `Unexpected file in .cursor/: ${entry}`,
           hint: '.cursor/ should contain only rules/, hooks.json, mcp.json, environment.json, or agents.json.',
+          code: 'unexpected-cursor-file',
         });
       }
       
@@ -950,6 +917,7 @@ async function lintProjectStructure(dir) {
                 severity: 'warning',
                 message: `Non-.mdc file in rules/: ${path.relative(rulesDir, itemPath)}`,
                 hint: '.cursor/rules/ should only contain .mdc files.',
+                code: 'non-mdc-in-rules',
               });
             }
           }
@@ -975,6 +943,7 @@ async function lintContextFiles(dir) {
         severity: 'warning',
         message: `AGENTS.md is very large (${Math.round(size / 1000)}KB)`,
         hint: 'Context files over 10KB waste tokens. Consider splitting into smaller, more focused files.',
+        code: 'context-file-large',
       });
     }
   }
@@ -988,6 +957,7 @@ async function lintContextFiles(dir) {
         severity: 'warning',
         message: `CLAUDE.md is very large (${Math.round(size / 1000)}KB)`,
         hint: 'Context files over 10KB waste tokens. Consider splitting into smaller, more focused files.',
+        code: 'context-file-large',
       });
     }
   }
@@ -1000,6 +970,7 @@ async function lintContextFiles(dir) {
       severity: 'error',
       message: 'Both .cursorrules and .cursor/rules/ exist',
       hint: 'This creates conflicts. Run "cursor-doctor migrate" to convert .cursorrules to .mdc files, then delete .cursorrules.',
+      code: 'duplicate-rules-config',
     });
   }
 
@@ -1020,6 +991,7 @@ async function lintContextFiles(dir) {
         severity: 'warning',
         message: 'AGENTS.md and CLAUDE.md have overlapping content',
         hint: 'Duplicated instructions across context files waste tokens. Consolidate into one file or clearly separate concerns.',
+        code: 'overlapping-context',
       });
     }
   }
@@ -1049,6 +1021,7 @@ async function lintCursorConfig(dir) {
                 severity: 'error',
                 message: `Hook "${event}" references missing script: ${script}`,
                 hint: 'Create the script file or remove the hook reference.',
+                code: 'hook-missing-script',
               });
             }
           }
@@ -1059,6 +1032,7 @@ async function lintCursorConfig(dir) {
         severity: 'error',
         message: `.cursor/hooks.json has syntax errors: ${e.message}`,
         hint: 'Fix JSON syntax errors in hooks.json.',
+        code: 'hooks-json-error',
       });
     }
   }
@@ -1073,6 +1047,7 @@ async function lintCursorConfig(dir) {
         severity: 'error',
         message: `.cursor/environment.json has syntax errors: ${e.message}`,
         hint: 'Fix JSON syntax errors in environment.json.',
+        code: 'environment-json-error',
       });
     }
   }
@@ -1092,12 +1067,14 @@ async function lintCursorConfig(dir) {
           severity: 'error',
           message: `Agent file ${file} is empty`,
           hint: 'Add agent behavior instructions or remove the file.',
+          code: 'agent-file-empty',
         });
       } else if (content.trim().length < 20) {
         issues.push({
           severity: 'warning',
           message: `Agent file ${file} is very short (${content.trim().length} chars)`,
           hint: 'Agent files should contain enough detail for the agent to understand its role.',
+          code: 'agent-file-short',
         });
       }
     }
@@ -1133,7 +1110,7 @@ async function lintProject(dir) {
   if (results.length === 0) {
     results.push({
       file: dir,
-      issues: [{ severity: 'warning', message: 'No Cursor rules or agent skills found in this directory' }],
+      issues: [{ severity: 'warning', message: 'No Cursor rules or agent skills found in this directory', code: 'no-rules-found' }],
     });
   }
 
@@ -1158,6 +1135,7 @@ async function lintProject(dir) {
           severity: 'warning',
           message: `Project has ${mdcFiles.length} rule files`,
           hint: 'More rules means more tokens consumed per request. Consider consolidating related rules.',
+          code: 'excessive-rules',
         }],
       });
     }
@@ -1187,6 +1165,7 @@ async function lintProject(dir) {
                 severity: 'warning',
                 message: `Possible duplicate rules: ${a.file} and ${b.file}`,
                 hint: 'These rules have very similar content. Consider merging them.',
+                code: 'duplicate-rules',
               }],
             });
           }
@@ -1199,6 +1178,7 @@ async function lintProject(dir) {
                 severity: 'warning',
                 message: `Duplicate descriptions: ${a.file} and ${b.file}`,
                 hint: 'Each rule should have a unique description so Cursor can differentiate them.',
+                code: 'duplicate-descriptions',
               }],
             });
           }
@@ -1379,6 +1359,7 @@ function detectConflicts(dir) {
               severity: 'error',
               message: `Conflicting rules: ${a.file} says "${dA.type} ${dA.subject}" but ${b.file} says "${dB.type} ${dB.subject}"`,
               hint: 'Conflicting directives confuse the model. Remove or reconcile one of these rules.',
+              code: 'rule-conflict',
             });
           }
         }
@@ -1392,6 +1373,7 @@ function detectConflicts(dir) {
             severity: 'warning',
             message: `Overlapping globs: ${a.file} and ${b.file} both target ${sharedGlobs.join(', ')}`,
             hint: 'Multiple rules targeting the same files may cause unpredictable behavior. Consider merging them.',
+            code: 'overlapping-globs',
           });
         }
       }
