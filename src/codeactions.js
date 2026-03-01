@@ -19,6 +19,22 @@ class CursorDoctorCodeActionProvider {
       }
     }
 
+    // Add "Fix all issues in this file" action if there are any diagnostics
+    var fileDiagnostics = context.diagnostics.filter(function (d) { return d.source === 'cursor-doctor'; });
+    if (fileDiagnostics.length > 0) {
+      var fixAllAction = new vscode.CodeAction(
+        'Fix all issues in this file',
+        vscode.CodeActionKind.QuickFix
+      );
+      fixAllAction.diagnostics = fileDiagnostics;
+      fixAllAction.command = {
+        command: 'cursorDoctor.fixAllInFile',
+        title: 'Fix All Issues',
+        arguments: [document.uri]
+      };
+      actions.push(fixAllAction);
+    }
+
     return actions;
   }
 }
@@ -116,6 +132,390 @@ function getFixesForCode(code, document, diag) {
       var template = '\n# Rule Name\n\n## Instructions\n\n- Your rule instructions here\n\n## Examples\n\n```\n// good example\n```\n';
       action.edit.insert(document.uri, new vscode.Position(lastLine + 1, 0), template);
       actions.push(action);
+      break;
+    }
+
+    case 'boolean-string': {
+      // Fix "true" / "false" to true / false
+      var fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
+      if (fmMatch) {
+        var yaml = fmMatch[1];
+        var fixedYaml = yaml.replace(/^(alwaysApply:\s*)["']?(true|false)["']?\s*$/m, '$1$2');
+        
+        if (fixedYaml !== yaml) {
+          var action = new vscode.CodeAction(
+            'Fix boolean strings to boolean values',
+            vscode.CodeActionKind.QuickFix
+          );
+          action.diagnostics = [diag];
+          action.isPreferred = true;
+          action.edit = new vscode.WorkspaceEdit();
+          
+          var fmStartLine = 0;
+          var fmEndLine = findFrontmatterEndLine(text) + 1;
+          var range = new vscode.Range(
+            new vscode.Position(fmStartLine, 0),
+            new vscode.Position(fmEndLine, 0)
+          );
+          action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
+          actions.push(action);
+        }
+      }
+      break;
+    }
+
+    case 'tabs-in-frontmatter': {
+      var fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
+      if (fmMatch && fmMatch[1].includes('\t')) {
+        var yaml = fmMatch[1];
+        var lines = yaml.split('\n');
+        var fixed = lines.map(function(line) {
+          return line.replace(/^(\w+):\t+/g, '$1: ').replace(/\t/g, '  ');
+        }).join('\n');
+        
+        var action = new vscode.CodeAction(
+          'Replace tabs with spaces in frontmatter',
+          vscode.CodeActionKind.QuickFix
+        );
+        action.diagnostics = [diag];
+        action.isPreferred = true;
+        action.edit = new vscode.WorkspaceEdit();
+        
+        var fmStartLine = 0;
+        var fmEndLine = findFrontmatterEndLine(text) + 1;
+        var range = new vscode.Range(
+          new vscode.Position(fmStartLine, 0),
+          new vscode.Position(fmEndLine, 0)
+        );
+        action.edit.replace(document.uri, range, '---\n' + fixed + '\n---\n');
+        actions.push(action);
+      }
+      break;
+    }
+
+    case 'please-thank-you': {
+      // Remove please/thank you from the document
+      var action = new vscode.CodeAction(
+        'Remove please/thank you',
+        vscode.CodeActionKind.QuickFix
+      );
+      action.diagnostics = [diag];
+      action.isPreferred = true;
+      action.edit = new vscode.WorkspaceEdit();
+      
+      var lines = text.split('\n');
+      var fixedLines = lines.map(function(line) {
+        var trimmed = line.trim();
+        
+        // Lines starting with "Thank you" / "Thanks" — remove entirely
+        if (/^thank\s*(you|s)\b/i.test(trimmed)) {
+          return null;
+        }
+        
+        // "Please X" at start of line → "X" (capitalize first word)
+        if (/^please\s+/i.test(trimmed)) {
+          var rest = trimmed.replace(/^please\s+/i, '');
+          return line.replace(trimmed, rest.charAt(0).toUpperCase() + rest.slice(1));
+        }
+        
+        // "X please" at end → "X"
+        if (/\s+please[.!]?\s*$/i.test(trimmed)) {
+          return line.replace(/,?\s+please([.!]?)\s*$/i, '$1');
+        }
+        
+        return line;
+      }).filter(function(l) { return l !== null; });
+      
+      var fullRange = new vscode.Range(
+        new vscode.Position(0, 0),
+        new vscode.Position(document.lineCount, 0)
+      );
+      action.edit.replace(document.uri, fullRange, fixedLines.join('\n'));
+      actions.push(action);
+      break;
+    }
+
+    case 'first-person': {
+      // Remove first person language
+      var action = new vscode.CodeAction(
+        'Remove first person language',
+        vscode.CodeActionKind.QuickFix
+      );
+      action.diagnostics = [diag];
+      action.isPreferred = true;
+      action.edit = new vscode.WorkspaceEdit();
+      
+      var lines = text.split('\n');
+      var fixedLines = lines.map(function(line) {
+        var patterns = [
+          /^(\s*)I want you to\s+/i,
+          /^(\s*)I need you to\s+/i,
+          /^(\s*)I'd like you to\s+/i,
+          /^(\s*)My preference is (to\s+)?/i,
+        ];
+        
+        for (var p = 0; p < patterns.length; p++) {
+          var match = line.match(patterns[p]);
+          if (match) {
+            var indent = match[1] || '';
+            var rest = line.slice(match[0].length);
+            return indent + rest.charAt(0).toUpperCase() + rest.slice(1);
+          }
+        }
+        return line;
+      });
+      
+      var fullRange = new vscode.Range(
+        new vscode.Position(0, 0),
+        new vscode.Position(document.lineCount, 0)
+      );
+      action.edit.replace(document.uri, fullRange, fixedLines.join('\n'));
+      actions.push(action);
+      break;
+    }
+
+    case 'trailing-whitespace': {
+      var action = new vscode.CodeAction(
+        'Remove trailing whitespace',
+        vscode.CodeActionKind.QuickFix
+      );
+      action.diagnostics = [diag];
+      action.isPreferred = true;
+      action.edit = new vscode.WorkspaceEdit();
+      
+      var lines = text.split('\n');
+      var fixedLines = lines.map(function(line) {
+        return line.trimEnd();
+      });
+      
+      var fullRange = new vscode.Range(
+        new vscode.Position(0, 0),
+        new vscode.Position(document.lineCount, 0)
+      );
+      action.edit.replace(document.uri, fullRange, fixedLines.join('\n'));
+      actions.push(action);
+      break;
+    }
+
+    case 'excessive-blank-lines': {
+      var action = new vscode.CodeAction(
+        'Collapse excessive blank lines',
+        vscode.CodeActionKind.QuickFix
+      );
+      action.diagnostics = [diag];
+      action.isPreferred = true;
+      action.edit = new vscode.WorkspaceEdit();
+      
+      var fixed = text.replace(/\n\n\n+/g, '\n\n');
+      
+      var fullRange = new vscode.Range(
+        new vscode.Position(0, 0),
+        new vscode.Position(document.lineCount, 0)
+      );
+      action.edit.replace(document.uri, fullRange, fixed);
+      actions.push(action);
+      break;
+    }
+
+    case 'html-comments': {
+      var action = new vscode.CodeAction(
+        'Remove HTML comments',
+        vscode.CodeActionKind.QuickFix
+      );
+      action.diagnostics = [diag];
+      action.isPreferred = true;
+      action.edit = new vscode.WorkspaceEdit();
+      
+      var fixed = text.replace(/<!--[\s\S]*?-->/g, '');
+      
+      var fullRange = new vscode.Range(
+        new vscode.Position(0, 0),
+        new vscode.Position(document.lineCount, 0)
+      );
+      action.edit.replace(document.uri, fullRange, fixed);
+      actions.push(action);
+      break;
+    }
+
+    case 'glob-backslashes': {
+      var fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
+      if (fmMatch) {
+        var yaml = fmMatch[1];
+        var lines = yaml.split('\n');
+        var fixedLines = lines.map(function(line) {
+          if (line.trim().startsWith('-') && line.includes('\\')) {
+            return line.replace(/\\/g, '/');
+          }
+          return line;
+        });
+        
+        var fixedYaml = fixedLines.join('\n');
+        if (fixedYaml !== yaml) {
+          var action = new vscode.CodeAction(
+            'Replace backslashes with forward slashes in globs',
+            vscode.CodeActionKind.QuickFix
+          );
+          action.diagnostics = [diag];
+          action.isPreferred = true;
+          action.edit = new vscode.WorkspaceEdit();
+          
+          var fmStartLine = 0;
+          var fmEndLine = findFrontmatterEndLine(text) + 1;
+          var range = new vscode.Range(
+            new vscode.Position(fmStartLine, 0),
+            new vscode.Position(fmEndLine, 0)
+          );
+          action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
+          actions.push(action);
+        }
+      }
+      break;
+    }
+
+    case 'glob-trailing-slash': {
+      var fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
+      if (fmMatch) {
+        var yaml = fmMatch[1];
+        var fixedYaml = yaml.replace(/^(\s*-\s*"[^"]*?)\/("\s*)$/gm, '$1$2');
+        fixedYaml = fixedYaml.replace(/("[^"]*?)\/("[\s,\]])/g, '$1$2');
+        
+        if (fixedYaml !== yaml) {
+          var action = new vscode.CodeAction(
+            'Remove trailing slashes from globs',
+            vscode.CodeActionKind.QuickFix
+          );
+          action.diagnostics = [diag];
+          action.isPreferred = true;
+          action.edit = new vscode.WorkspaceEdit();
+          
+          var fmStartLine = 0;
+          var fmEndLine = findFrontmatterEndLine(text) + 1;
+          var range = new vscode.Range(
+            new vscode.Position(fmStartLine, 0),
+            new vscode.Position(fmEndLine, 0)
+          );
+          action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
+          actions.push(action);
+        }
+      }
+      break;
+    }
+
+    case 'glob-dot-prefix': {
+      var fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
+      if (fmMatch) {
+        var yaml = fmMatch[1];
+        var fixedYaml = yaml.replace(/^(\s*-\s*")\.\//gm, '$1');
+        fixedYaml = fixedYaml.replace(/(globs:\s*")\.\//g, '$1');
+        
+        if (fixedYaml !== yaml) {
+          var action = new vscode.CodeAction(
+            'Remove ./ prefix from globs',
+            vscode.CodeActionKind.QuickFix
+          );
+          action.diagnostics = [diag];
+          action.isPreferred = true;
+          action.edit = new vscode.WorkspaceEdit();
+          
+          var fmStartLine = 0;
+          var fmEndLine = findFrontmatterEndLine(text) + 1;
+          var range = new vscode.Range(
+            new vscode.Position(fmStartLine, 0),
+            new vscode.Position(fmEndLine, 0)
+          );
+          action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
+          actions.push(action);
+        }
+      }
+      break;
+    }
+
+    case 'unclosed-code-block': {
+      var action = new vscode.CodeAction(
+        'Add closing code block marker',
+        vscode.CodeActionKind.QuickFix
+      );
+      action.diagnostics = [diag];
+      action.isPreferred = true;
+      action.edit = new vscode.WorkspaceEdit();
+      
+      var lastLine = document.lineCount - 1;
+      var lastLineText = document.lineAt(lastLine).text;
+      var insertion = lastLineText.length > 0 ? '\n```' : '```';
+      
+      action.edit.insert(document.uri, new vscode.Position(lastLine, lastLineText.length), insertion);
+      actions.push(action);
+      break;
+    }
+
+    case 'description-has-markdown': {
+      var fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
+      if (fmMatch) {
+        var yaml = fmMatch[1];
+        var descLine = yaml.match(/^description:\s*(.+)$/m);
+        
+        if (descLine && /[*_`#\[\]]/.test(descLine[1])) {
+          var cleanDesc = descLine[1].replace(/[*_`#\[\]]/g, '');
+          var fixedYaml = yaml.replace(/^description:.*$/m, 'description: ' + cleanDesc);
+          
+          var action = new vscode.CodeAction(
+            'Remove markdown formatting from description',
+            vscode.CodeActionKind.QuickFix
+          );
+          action.diagnostics = [diag];
+          action.isPreferred = true;
+          action.edit = new vscode.WorkspaceEdit();
+          
+          var fmStartLine = 0;
+          var fmEndLine = findFrontmatterEndLine(text) + 1;
+          var range = new vscode.Range(
+            new vscode.Position(fmStartLine, 0),
+            new vscode.Position(fmEndLine, 0)
+          );
+          action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
+          actions.push(action);
+        }
+      }
+      break;
+    }
+
+    case 'unknown-frontmatter-key': {
+      // Extract the unknown key from the diagnostic message
+      var keyMatch = diag.message.match(/Unknown frontmatter key: (\w+)/);
+      if (keyMatch) {
+        var unknownKey = keyMatch[1];
+        var fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
+        
+        if (fmMatch) {
+          var yaml = fmMatch[1];
+          var lines = yaml.split('\n');
+          var filteredLines = lines.filter(function(line) {
+            var colonIdx = line.indexOf(':');
+            if (colonIdx === -1) return true;
+            var key = line.slice(0, colonIdx).trim();
+            return key !== unknownKey;
+          });
+          
+          var fixedYaml = filteredLines.join('\n');
+          
+          var action = new vscode.CodeAction(
+            'Remove unknown frontmatter key: ' + unknownKey,
+            vscode.CodeActionKind.QuickFix
+          );
+          action.diagnostics = [diag];
+          action.isPreferred = true;
+          action.edit = new vscode.WorkspaceEdit();
+          
+          var fmStartLine = 0;
+          var fmEndLine = findFrontmatterEndLine(text) + 1;
+          var range = new vscode.Range(
+            new vscode.Position(fmStartLine, 0),
+            new vscode.Position(fmEndLine, 0)
+          );
+          action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
+          actions.push(action);
+        }
+      }
       break;
     }
 

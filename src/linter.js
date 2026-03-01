@@ -146,7 +146,7 @@ async function lintMdcFile(filePath) {
 
   // Skip binary files
   if (/[\x00-\x08\x0E-\x1F]/.test(content.slice(0, 512))) {
-    return { file: filePath, issues: [{ severity: 'warning', message: 'File appears to be binary, not a text rule', hint: 'Remove non-text files from .cursor/rules/' }] };
+    return { file: filePath, issues: [{ severity: 'warning', message: 'File appears to be binary, not a text rule', hint: 'Remove non-text files from .cursor/rules/', line: 1 }] };
   }
 
   const issues = [];
@@ -154,45 +154,80 @@ async function lintMdcFile(filePath) {
   const fm = parseFrontmatter(content);
 
   if (!fm.found) {
-    issues.push({ severity: 'error', message: 'Missing YAML frontmatter', hint: 'Add --- block with description and alwaysApply: true' });
+    issues.push({ severity: 'error', message: 'Missing YAML frontmatter', hint: 'Add --- block with description and alwaysApply: true', line: 1, code: 'missing-frontmatter' });
   } else if (fm.error) {
-    issues.push({ severity: 'error', message: `YAML frontmatter error: ${fm.error}`, hint: 'Fix frontmatter indentation/syntax' });
+    issues.push({ severity: 'error', message: `YAML frontmatter error: ${fm.error}`, hint: 'Fix frontmatter indentation/syntax', line: 1, code: 'frontmatter-error' });
   } else {
     // alwaysApply check: only flag if BOTH alwaysApply is missing/undefined AND no globs are set
     var hasGlobs = fm.data.globs && (Array.isArray(fm.data.globs) ? fm.data.globs.length > 0 : parseGlobs(fm.data.globs).length > 0);
     if (fm.data.alwaysApply === undefined && !hasGlobs) {
-      issues.push({ severity: 'warning', message: 'No alwaysApply or globs set — rule may only apply when manually referenced', hint: 'Add alwaysApply: true for global rules, or add globs to scope to specific files' });
+      const line = findLineInFrontmatter(content, 'description') || 2;
+      issues.push({ severity: 'warning', message: 'No alwaysApply or globs set — rule may only apply when manually referenced', hint: 'Add alwaysApply: true for global rules, or add globs to scope to specific files', line, code: 'missing-alwaysapply' });
     }
     var descEmpty = !fm.data.description || (typeof fm.data.description === 'string' && fm.data.description.trim() === '') || (Array.isArray(fm.data.description) && fm.data.description.length === 0);
     if (descEmpty) {
-      issues.push({ severity: 'warning', message: 'Missing or empty description in frontmatter', hint: 'Add a description so Cursor knows when to apply this rule' });
+      const line = findLineInFrontmatter(content, 'description') || 2;
+      issues.push({ severity: 'warning', message: 'Missing or empty description in frontmatter', hint: 'Add a description so Cursor knows when to apply this rule', line, code: 'missing-description' });
     }
     // Non-functional rule: alwaysApply is explicitly false and no globs
     if (fm.data.alwaysApply === false && !hasGlobs) {
-      issues.push({ severity: 'error', message: 'Rule will never load: alwaysApply is false and no globs are set', hint: 'Set alwaysApply: true for global rules, or add globs to scope to specific files' });
+      const line = findLineInFrontmatter(content, 'alwaysApply') || 2;
+      issues.push({ severity: 'error', message: 'Rule will never load: alwaysApply is false and no globs are set', hint: 'Set alwaysApply: true for global rules, or add globs to scope to specific files', line });
     }
     if (fm.data.globs && typeof fm.data.globs === 'string' && fm.data.globs.includes(',') && !fm.data.globs.trim().startsWith('[')) {
-      issues.push({ severity: 'warning', message: 'Globs as comma-separated string — consider using YAML array format', hint: 'Use globs:\\n  - "*.ts"\\n  - "*.tsx"' });
+      const line = findLineInFrontmatter(content, 'globs') || 2;
+      issues.push({ severity: 'warning', message: 'Globs as comma-separated string — consider using YAML array format', hint: 'Use globs:\\n  - "*.ts"\\n  - "*.tsx"', line, code: 'globs-not-array' });
     }
 
     // NEW: Frontmatter has unknown keys
     const validKeys = ['description', 'globs', 'alwaysApply'];
     for (const key in fm.data) {
       if (!validKeys.includes(key)) {
+        const line = findLineInFrontmatter(content, key) || 2;
         issues.push({
           severity: 'warning',
           message: `Unknown frontmatter key: ${key}`,
           hint: `Valid keys: ${validKeys.join(', ')}. Unknown keys are ignored by Cursor.`,
+          line,
+          code: 'unknown-frontmatter-key',
         });
       }
     }
 
     // NEW: Description contains markdown formatting
     if (fm.data.description && /[*_`#\[\]]/.test(fm.data.description)) {
+      const line = findLineInFrontmatter(content, 'description') || 2;
       issues.push({
         severity: 'warning',
         message: 'Description contains markdown formatting',
         hint: 'Descriptions should be plain text. Save formatting for the rule body.',
+        line,
+        code: 'description-has-markdown',
+      });
+    }
+
+    // NEW: alwaysApply is string instead of boolean
+    if (fm.data.alwaysApply === 'true' || fm.data.alwaysApply === 'false') {
+      const line = findLineInFrontmatter(content, 'alwaysApply') || 2;
+      issues.push({
+        severity: 'warning',
+        message: `alwaysApply should be boolean, not string: ${fm.data.alwaysApply}`,
+        hint: 'Remove quotes: use alwaysApply: true not alwaysApply: "true"',
+        line,
+        code: 'boolean-string',
+      });
+    }
+
+    // NEW: Frontmatter contains tabs
+    const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+    if (fmMatch && fmMatch[1].includes('\t')) {
+      const line = findLineInFrontmatter(content, '') || 2;
+      issues.push({
+        severity: 'warning',
+        message: 'Frontmatter contains tabs',
+        hint: 'Replace tabs with spaces for consistent YAML formatting',
+        line,
+        code: 'tabs-in-frontmatter',
       });
     }
 
@@ -234,10 +269,14 @@ async function lintMdcFile(filePath) {
 
   // 3. Empty rule body
   if (fm.found && body.trim().length === 0) {
+    const fmEndLine = findLineWith(content, /^---$/);
+    const line = fmEndLine ? fmEndLine + 1 : 1;
     issues.push({
       severity: 'error',
       message: 'Rule file has frontmatter but no instructions',
       hint: 'Add rule instructions after the --- frontmatter block.',
+      line,
+      code: 'empty-body',
     });
   }
 
@@ -289,28 +328,37 @@ async function lintMdcFile(filePath) {
 
       // NEW: Glob uses Windows backslashes
       if (glob.includes('\\')) {
+        const line = findLineInFrontmatter(content, 'globs') || 2;
         issues.push({
           severity: 'warning',
           message: `Glob pattern uses Windows backslashes: ${glob}`,
           hint: 'Use forward slashes for cross-platform compatibility.',
+          line,
+          code: 'glob-backslashes',
         });
       }
 
       // NEW: Glob has trailing slash
       if (glob.endsWith('/')) {
+        const line = findLineInFrontmatter(content, 'globs') || 2;
         issues.push({
           severity: 'warning',
           message: `Glob pattern has trailing slash: ${glob}`,
           hint: 'Trailing slashes are not valid glob syntax. Remove the trailing /.',
+          line,
+          code: 'glob-trailing-slash',
         });
       }
 
       // NEW: Glob starts with ./
       if (glob.startsWith('./')) {
+        const line = findLineInFrontmatter(content, 'globs') || 2;
         issues.push({
           severity: 'info',
           message: `Glob starts with ./: ${glob}`,
           hint: 'Cursor resolves globs from project root. The ./ prefix is unnecessary.',
+          line,
+          code: 'glob-dot-prefix',
         });
       }
     }
@@ -423,10 +471,127 @@ async function lintMdcFile(filePath) {
 
   // Rule body has excessive blank lines
   if (/\n\n\n\n/.test(body)) {
+    const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
+    const relLine = findLineWith(body, /^\s*$/) || 1;
     issues.push({
       severity: 'info',
       message: 'Rule body has excessive blank lines (>3 consecutive)',
       hint: 'Excessive whitespace wastes tokens. Use 1-2 blank lines for separation.',
+      line: bodyStartLine + relLine - 1,
+      code: 'excessive-blank-lines',
+    });
+  }
+
+  // NEW: Trailing whitespace
+  const bodyLines = body.split('\n');
+  for (let i = 0; i < bodyLines.length; i++) {
+    if (bodyLines[i].match(/\s+$/)) {
+      const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
+      issues.push({
+        severity: 'info',
+        message: 'Line has trailing whitespace',
+        hint: 'Remove trailing spaces/tabs to keep files clean',
+        line: bodyStartLine + i,
+        code: 'trailing-whitespace',
+      });
+      break; // Only report once
+    }
+  }
+
+  // NEW: HTML comments
+  if (/<!--[\s\S]*?-->/.test(body)) {
+    const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
+    const relLine = findLineWith(body, /<!--/) || 1;
+    issues.push({
+      severity: 'warning',
+      message: 'Rule body contains HTML comments',
+      hint: 'Cursor ignores HTML comments. Remove them or use plain text notes.',
+      line: bodyStartLine + relLine - 1,
+      code: 'html-comments',
+    });
+  }
+
+  // NEW: Unclosed code block
+  const codeBlockMatches = body.match(/```/g);
+  if (codeBlockMatches && codeBlockMatches.length % 2 !== 0) {
+    const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
+    const lines = body.split('\n');
+    let openLine = 0;
+    let count = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('```')) {
+        count++;
+        if (count % 2 === 1) openLine = i + 1;
+      }
+    }
+    issues.push({
+      severity: 'error',
+      message: 'Unclosed code block (odd number of ```)',
+      hint: 'Add closing ``` to complete the code block',
+      line: bodyStartLine + openLine - 1,
+      code: 'unclosed-code-block',
+    });
+  }
+
+  // Rule has trailing whitespace
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] !== lines[i].trimEnd()) {
+      issues.push({
+        severity: 'info',
+        message: 'Rule has trailing whitespace',
+        hint: 'Trailing whitespace wastes bytes. Clean it up.',
+        line: i + 1,
+        code: 'trailing-whitespace',
+      });
+      break; // Only report once
+    }
+  }
+
+  // HTML comments in body
+  if (/<!--[\s\S]*?-->/.test(body)) {
+    const match = body.match(/<!--/);
+    if (match) {
+      const bodyLines = body.split('\n');
+      let line = 1;
+      for (let i = 0; i < bodyLines.length; i++) {
+        if (bodyLines[i].includes('<!--')) {
+          line = i + 1;
+          // Adjust for frontmatter offset
+          const fmLines = (content.match(/^---\n[\s\S]*?\n---\n?/) || [''])[0].split('\n').length;
+          line += fmLines;
+          break;
+        }
+      }
+      issues.push({
+        severity: 'warning',
+        message: 'Rule body contains HTML comments',
+        hint: 'Remove commented-out sections. They waste tokens and confuse the model.',
+        line,
+        code: 'html-comments',
+      });
+    }
+  }
+
+  // Unclosed code blocks
+  const codeBlockMarkers = body.match(/```/g);
+  if (codeBlockMarkers && codeBlockMarkers.length % 2 !== 0) {
+    const bodyLines = body.split('\n');
+    let line = 1;
+    for (let i = 0; i < bodyLines.length; i++) {
+      if (bodyLines[i].includes('```')) {
+        line = i + 1;
+        const fmLines = (content.match(/^---\n[\s\S]*?\n---\n?/) || [''])[0].split('\n').length;
+        line += fmLines;
+        break;
+      }
+    }
+    issues.push({
+      severity: 'error',
+      message: 'Unclosed code block (odd number of ``` markers)',
+      hint: 'Add closing ``` to match the opening code block.',
+      line,
+      code: 'unclosed-code-block',
     });
   }
 
@@ -487,19 +652,25 @@ async function lintMdcFile(filePath) {
 
   // Rule uses first person
   if (/\b(I want|I need|I'd like|my preference)\b/i.test(body)) {
+    const line = findLineWith(body, /\b(I want|I need|I'd like|my preference)\b/i);
     issues.push({
       severity: 'info',
       message: 'Rule uses first person ("I want you to...")',
       hint: 'First person wastes tokens. Use direct commands: "Use X" instead of "I want you to use X".',
+      line: line || 1,
+      code: 'first-person',
     });
   }
 
   // Rule uses please/thank you
   if (/\b(please|thank you|thanks)\b/i.test(body)) {
+    const line = findLineWith(body, /\b(please|thank you|thanks)\b/i);
     issues.push({
       severity: 'info',
       message: 'Rule uses please/thank you',
       hint: 'Politeness wastes tokens. AI models don\'t need courtesy words. Be direct.',
+      line: line || 1,
+      code: 'please-thank-you',
     });
   }
 
@@ -1070,6 +1241,34 @@ async function lintProject(dir) {
   } catch (e) { /* config lint failed gracefully */ }
 
   return results;
+}
+
+// Helper: Find line number of a key in frontmatter
+function findLineInFrontmatter(content, key) {
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim().startsWith(key + ':')) {
+      return i + 1;
+    }
+    if (lines[i].trim() === '---' && i > 0) {
+      // End of frontmatter, key not found
+      return null;
+    }
+  }
+  return null;
+}
+
+// Helper: Find line number containing a pattern
+function findLineWith(content, pattern) {
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (typeof pattern === 'string') {
+      if (lines[i].includes(pattern)) return i + 1;
+    } else if (pattern instanceof RegExp) {
+      if (pattern.test(lines[i])) return i + 1;
+    }
+  }
+  return null;
 }
 
 function parseGlobs(globVal) {

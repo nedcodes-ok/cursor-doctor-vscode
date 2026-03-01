@@ -38,6 +38,7 @@ function activate(context) {
     vscode.commands.registerCommand('cursorDoctor.scan', cmdScan),
     vscode.commands.registerCommand('cursorDoctor.lint', cmdLint),
     vscode.commands.registerCommand('cursorDoctor.fix', cmdFix),
+    vscode.commands.registerCommand('cursorDoctor.fixAllInFile', cmdFixAllInFile),
     vscode.commands.registerCommand('cursorDoctor.migrate', cmdMigrate),
     vscode.commands.registerCommand('cursorDoctor.generate', cmdGenerate),
     vscode.commands.registerCommand('cursorDoctor.activate', cmdActivate)
@@ -58,6 +59,21 @@ function activate(context) {
     vscode.workspace.onDidOpenTextDocument(function (doc) {
       if (doc.fileName.endsWith('.mdc') || doc.fileName.endsWith('.cursorrules')) {
         lintSingleFile(doc);
+      }
+    })
+  );
+
+  // Lint on text change (debounced)
+  var debounceTimer = null;
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument(function (event) {
+      var doc = event.document;
+      if (doc.fileName.endsWith('.mdc') || doc.fileName.endsWith('.cursorrules')) {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+          lintSingleFile(doc);
+          debounceTimer = null;
+        }, 500);
       }
     })
   );
@@ -87,9 +103,18 @@ async function updateHealthGrade() {
     var report = await doctor(folders[0].uri.fsPath);
     lastReport = report;
 
+    // Count total issues from diagnostics
+    var totalIssues = 0;
+    diagnosticCollection.forEach(function (uri, diagnostics) {
+      totalIssues += diagnostics.length;
+    });
+
     var icons = { A: '$(pass)', B: '$(pass)', C: '$(warning)', D: '$(warning)', F: '$(error)' };
     var icon = icons[report.grade] || '$(info)';
-    statusBarItem.text = icon + ' Cursor: ' + report.grade + ' (' + report.percentage + '%)';
+    
+    // Show grade with issue count
+    var issueText = totalIssues === 0 ? '' : ' (' + totalIssues + ' issue' + (totalIssues !== 1 ? 's' : '') + ')';
+    statusBarItem.text = icon + ' Cursor: ' + report.grade + issueText;
 
     if (report.grade === 'A' || report.grade === 'B') {
       statusBarItem.backgroundColor = undefined;
@@ -253,6 +278,9 @@ async function lintSingleFile(document) {
 
   var diagnostics = issuesToDiagnostics(result.issues, document);
   diagnosticCollection.set(document.uri, diagnostics);
+  
+  // Update status bar with new issue count
+  updateHealthGrade();
 }
 
 function issuesToDiagnostics(issues, document) {
