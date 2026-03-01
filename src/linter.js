@@ -318,18 +318,22 @@ async function lintMdcFile(filePath) {
       }
       // Glob contains spaces
       if (glob.includes(' ') && !glob.includes('"') && !glob.includes("'")) {
+        const line = findLineInFrontmatter(content, 'globs') || 2;
         issues.push({
           severity: 'warning',
           message: 'Glob pattern contains spaces',
           hint: 'Glob patterns with spaces may not match correctly.',
+          line,
           code: 'glob-spaces',
         });
       }
       // Glob is *.
       if (glob === '*.') {
+        const line = findLineInFrontmatter(content, 'globs') || 2;
         issues.push({
           severity: 'warning',
           message: 'Glob pattern has no file extension after dot',
+          line,
           code: 'glob-no-extension',
         });
       }
@@ -379,10 +383,12 @@ async function lintMdcFile(filePath) {
       }).filter(Boolean);
       
       if (extensions.length >= 2 && extensions.length === globs.length) {
+        const line = findLineInFrontmatter(content, 'globs') || 2;
         issues.push({
           severity: 'info',
           message: `Multiple globs could be simplified: ${globs.join(', ')}`,
           hint: `Consider using ["*.{${extensions.join(',')}}"] for cleaner syntax.`,
+          line,
           code: 'glob-simplify',
         });
       }
@@ -393,10 +399,12 @@ async function lintMdcFile(filePath) {
   if (fm.data && fm.data.alwaysApply === true && fm.data.globs) {
     const globs = parseGlobs(fm.data.globs);
     if (globs.length > 0) {
+      const line = findLineInFrontmatter(content, 'globs') || 2;
       issues.push({
         severity: 'info',
         message: 'alwaysApply is true with globs set',
         hint: 'When alwaysApply is true, globs serve as a hint to the model but don\'t filter. This is fine if intentional.',
+        line,
         code: 'alwaysapply-with-globs',
       });
     }
@@ -424,10 +432,12 @@ async function lintMdcFile(filePath) {
   if (/<[^>]+>/.test(body) && !hasCodeBlocks) {
     const xmlTags = body.match(/<\w+[^>]*>/g);
     if (xmlTags && xmlTags.length > 0) {
+      const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
       issues.push({
         severity: 'warning',
         message: 'Rule body contains XML/HTML tags',
         hint: 'Cursor doesn\'t process XML/HTML in rules. Use markdown or plain text instead.',
+        line: bodyStartLine,
         code: 'xml-tags',
       });
     }
@@ -435,30 +445,37 @@ async function lintMdcFile(filePath) {
 
   // Rule has broken markdown links
   if (/\]\[/.test(body) || /\[[^\]]*\]\([^\)]*$/.test(body)) {
+    const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
     issues.push({
       severity: 'warning',
       message: 'Rule body has broken markdown links',
       hint: 'Fix link syntax: [text](url)',
+      line: bodyStartLine,
       code: 'broken-links',
     });
   }
 
   // Rule body starts with the description repeated
   if (fm.data && fm.data.description && body.trim().startsWith(fm.data.description)) {
+    const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
     issues.push({
       severity: 'warning',
       message: 'Rule body starts with description repeated',
       hint: 'Redundant content wastes tokens. Remove the duplicate description from the body.',
+      line: bodyStartLine,
       code: 'duplicate-description',
     });
   }
 
   // Rule contains TODO/FIXME/HACK comments
   if (/\b(TODO|FIXME|HACK|XXX)\b/i.test(body)) {
+    const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
+    const relLine = findLineWith(body, /\b(TODO|FIXME|HACK|XXX)\b/i) || 1;
     issues.push({
       severity: 'warning',
       message: 'Rule contains TODO/FIXME/HACK comments',
       hint: 'Unfinished rules confuse the model. Finish the rule or remove it.',
+      line: bodyStartLine + relLine - 1,
       code: 'todo-comments',
     });
   }
@@ -476,10 +493,12 @@ async function lintMdcFile(filePath) {
       }
     }
     if (hasSkip) {
+      const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
       issues.push({
         severity: 'warning',
         message: 'Rule has inconsistent heading levels (jumps from # to ###)',
         hint: 'Use consistent heading hierarchy for better structure.',
+        line: bodyStartLine,
         code: 'inconsistent-headings',
       });
     }
@@ -556,10 +575,12 @@ async function lintMdcFile(filePath) {
     const listContext = body.toLowerCase();
     const hasSequenceWords = /\b(first|second|third|then|next|finally|after|before)\b/.test(listContext);
     if (!hasSequenceWords) {
+      const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
       issues.push({
         severity: 'info',
         message: 'Rule uses numbered lists where order may not matter',
         hint: 'Bullet lists are more flexible for AI and clearer when order is unimportant.',
+        line: bodyStartLine,
         code: 'numbered-list',
       });
     }
@@ -573,10 +594,13 @@ async function lintMdcFile(filePath) {
   ];
   for (const { pattern, example } of weakPatterns) {
     if (pattern.test(body)) {
+      const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
+      const relLine = findLineWith(body, pattern) || 1;
       issues.push({
         severity: 'warning',
         message: `Rule uses weak language: "${example}"`,
         hint: 'AI models follow commands better than suggestions. Use imperative mood: "Do X" instead of "try to do X".',
+        line: bodyStartLine + relLine - 1,
         code: 'weak-language',
       });
     }
@@ -588,10 +612,12 @@ async function lintMdcFile(filePath) {
     // Check if there's a corresponding "instead" or "use X instead"
     const hasAlternative = /instead|rather|prefer|use \w+ (?:rather|instead)/.test(body.toLowerCase());
     if (!hasAlternative) {
+      const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
       issues.push({
         severity: 'warning',
         message: 'Rule uses negations without alternatives',
         hint: 'Instead of "don\'t use X", say "use Y instead of X" to give the model clear direction.',
+        line: bodyStartLine,
         code: 'negation-no-alternative',
       });
     }
@@ -600,10 +626,12 @@ async function lintMdcFile(filePath) {
   // Rule has no clear actionable instructions
   const imperativeVerbs = /\b(use|write|create|add|remove|ensure|check|validate|follow|apply|implement)\b/i;
   if (body.length > 100 && !imperativeVerbs.test(body)) {
+    const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
     issues.push({
       severity: 'warning',
       message: 'Rule has no clear actionable instructions',
       hint: 'Rules should contain clear commands. Use imperative verbs: use, write, create, ensure, etc.',
+      line: bodyStartLine,
       code: 'no-actionable-instructions',
     });
   }
@@ -682,10 +710,12 @@ async function lintMdcFile(filePath) {
   }
   
   if (matchedConcerns.length >= 3) {
+    const bodyStartLine = findLineWith(content, /^---$/) ? findLineWith(content, /^---$/) + 1 : 1;
     issues.push({
       severity: 'warning',
       message: `Rule mixes multiple concerns: ${matchedConcerns.join(', ')}`,
       hint: 'Rules that cover too many topics are harder for the AI to apply correctly. Split into focused rules.',
+      line: bodyStartLine,
       code: 'mixed-concerns',
     });
   }

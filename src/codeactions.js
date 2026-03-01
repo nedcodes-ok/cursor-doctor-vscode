@@ -136,11 +136,11 @@ function getFixesForCode(code, document, diag) {
     }
 
     case 'boolean-string': {
-      // Fix "true" / "false" to true / false
+      // Fix "true" / "false" to true / false (case-insensitive)
       var fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
       if (fmMatch) {
         var yaml = fmMatch[1];
-        var fixedYaml = yaml.replace(/^(alwaysApply:\s*)["']?(true|false|True|False|TRUE|FALSE)["']?\s*$/mi, function(match, prefix, value) {
+        var fixedYaml = yaml.replace(/^(alwaysApply:\s*)["']?(true|false)["']?\s*$/gmi, function(match, prefix, value) {
           return prefix + value.toLowerCase();
         });
         
@@ -157,7 +157,7 @@ function getFixesForCode(code, document, diag) {
           var fmEndLine = findFrontmatterEndLine(text);
           var range = new vscode.Range(
             new vscode.Position(fmStartLine, 0),
-            new vscode.Position(fmEndLine + 1, 0)
+            new vscode.Position(fmEndLine, 0)
           );
           action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
           actions.push(action);
@@ -187,7 +187,7 @@ function getFixesForCode(code, document, diag) {
         var fmEndLine = findFrontmatterEndLine(text);
         var range = new vscode.Range(
           new vscode.Position(fmStartLine, 0),
-          new vscode.Position(fmEndLine + 1, 0)
+          new vscode.Position(fmEndLine, 0)
         );
         action.edit.replace(document.uri, range, '---\n' + fixed + '\n---\n');
         actions.push(action);
@@ -375,7 +375,7 @@ function getFixesForCode(code, document, diag) {
           var fmEndLine = findFrontmatterEndLine(text);
           var range = new vscode.Range(
             new vscode.Position(fmStartLine, 0),
-            new vscode.Position(fmEndLine + 1, 0)
+            new vscode.Position(fmEndLine, 0)
           );
           action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
           actions.push(action);
@@ -404,7 +404,7 @@ function getFixesForCode(code, document, diag) {
           var fmEndLine = findFrontmatterEndLine(text);
           var range = new vscode.Range(
             new vscode.Position(fmStartLine, 0),
-            new vscode.Position(fmEndLine + 1, 0)
+            new vscode.Position(fmEndLine, 0)
           );
           action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
           actions.push(action);
@@ -433,7 +433,7 @@ function getFixesForCode(code, document, diag) {
           var fmEndLine = findFrontmatterEndLine(text);
           var range = new vscode.Range(
             new vscode.Position(fmStartLine, 0),
-            new vscode.Position(fmEndLine + 1, 0)
+            new vscode.Position(fmEndLine, 0)
           );
           action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
           actions.push(action);
@@ -482,7 +482,7 @@ function getFixesForCode(code, document, diag) {
           var fmEndLine = findFrontmatterEndLine(text);
           var range = new vscode.Range(
             new vscode.Position(fmStartLine, 0),
-            new vscode.Position(fmEndLine + 1, 0)
+            new vscode.Position(fmEndLine, 0)
           );
           action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
           actions.push(action);
@@ -522,7 +522,7 @@ function getFixesForCode(code, document, diag) {
           var fmEndLine = findFrontmatterEndLine(text);
           var range = new vscode.Range(
             new vscode.Position(fmStartLine, 0),
-            new vscode.Position(fmEndLine + 1, 0)
+            new vscode.Position(fmEndLine, 0)
           );
           action.edit.replace(document.uri, range, '---\n' + fixedYaml + '\n---\n');
           actions.push(action);
