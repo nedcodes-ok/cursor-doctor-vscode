@@ -447,6 +447,85 @@ async function cmdActivate() {
   }
 }
 
+// --- Fix all issues in file command ---
+
+async function cmdFixAllInFile(uri) {
+  try {
+    var document = await vscode.workspace.openTextDocument(uri);
+    var text = document.getText();
+    
+    // Import all the fixer functions from CLI autofix.js
+    var {
+      fixBooleanStrings,
+      fixFrontmatterTabs,
+      fixCommaSeparatedGlobs,
+      fixEmptyGlobsArray,
+      fixDescriptionMarkdown,
+      fixUnknownFrontmatterKeys,
+      fixDescriptionRule,
+      fixExcessiveBlankLines,
+      fixTrailingWhitespace,
+      fixPleaseThankYou,
+      fixFirstPerson,
+      fixCommentedHTML,
+      fixUnclosedCodeBlocks,
+      fixInconsistentListMarkers,
+      fixGlobBackslashes,
+      fixGlobTrailingSlash,
+      fixGlobDotSlash,
+      fixGlobRegexSyntax,
+    } = require('./linter-fixers');
+    
+    var fixers = [
+      fixBooleanStrings,
+      fixFrontmatterTabs,
+      fixCommaSeparatedGlobs,
+      fixEmptyGlobsArray,
+      fixDescriptionMarkdown,
+      fixUnknownFrontmatterKeys,
+      fixDescriptionRule,
+      fixExcessiveBlankLines,
+      fixTrailingWhitespace,
+      fixPleaseThankYou,
+      fixFirstPerson,
+      fixCommentedHTML,
+      fixUnclosedCodeBlocks,
+      fixInconsistentListMarkers,
+      fixGlobRegexSyntax,
+      fixGlobBackslashes,
+      fixGlobTrailingSlash,
+      fixGlobDotSlash,
+    ];
+    
+    var allChanges = [];
+    for (var i = 0; i < fixers.length; i++) {
+      var result = fixers[i](text);
+      text = result.content;
+      allChanges.push(...result.changes);
+    }
+    
+    if (allChanges.length > 0) {
+      var edit = new vscode.WorkspaceEdit();
+      var fullRange = new vscode.Range(
+        new vscode.Position(0, 0),
+        new vscode.Position(document.lineCount, 0)
+      );
+      edit.replace(uri, fullRange, text);
+      
+      await vscode.workspace.applyEdit(edit);
+      vscode.window.showInformationMessage('Cursor Doctor: Applied ' + allChanges.length + ' fix' + (allChanges.length !== 1 ? 'es' : ''));
+      
+      // Re-lint the file
+      var updatedDoc = await vscode.workspace.openTextDocument(uri);
+      await lintSingleFile(updatedDoc);
+    } else {
+      vscode.window.showInformationMessage('Cursor Doctor: No auto-fixable issues found');
+    }
+  } catch (e) {
+    vscode.window.showErrorMessage('Fix all failed: ' + e.message);
+  }
+}
+
 function showWelcomePanel() {
   var panel = vscode.window.createWebviewPanel(
     'cursorDoctorWelcome',
